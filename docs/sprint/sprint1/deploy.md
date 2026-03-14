@@ -47,13 +47,13 @@
 
 ### 사전 준비
 
-1. `domain-dictionary/.env.local` 파일 생성:
+1. `domain-dictionary/.env.local` 파일 생성 (이미 완료):
 
 ```env
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=<8자 이상, 영문+숫자+특수문자>
+ADMIN_PASSWORD=Admin123!
 DATABASE_PATH=./data/app.db
-SESSION_SECRET=<32자 이상 임의 문자열>
+SESSION_SECRET=<자동 생성됨>
 ```
 
 2. 개발 서버 실행:
@@ -69,41 +69,35 @@ npm run dev
 
 #### 서버 기동 검증
 
-- ⬜ `npm run dev` 실행 후 `http://localhost:3000` 접속 가능 확인
-- ⬜ 서버 콘솔에 에러 없이 "Ready" 메시지 출력 확인
-- ⬜ 루트(`/`) 접속 시 `/login` 으로 리다이렉트 확인 (또는 로그인 페이지 렌더링)
+- ✅ `npm run dev` 실행 후 `http://localhost:3000` 접속 가능 확인
+- ✅ 서버 콘솔에 "Ready" 메시지 출력 확인
+- ✅ 루트(`/`) 접속 시 `/login` 으로 리다이렉트 확인
 
 #### 초기 관리자 계정 자동 생성 검증
 
-- ⬜ 서버 첫 시작 후 `users` 테이블에 admin 계정 1건 생성됨 확인
-  - 확인 방법: `npx drizzle-kit studio` 또는 SQLite 뷰어 사용
-  - 예: `sqlite3 data/app.db "SELECT username, role FROM users;"`
-- ⬜ 서버 재시작 후 중복 생성 없음 확인
+- ✅ 서버 첫 시작 후 콘솔: `[seed-admin] 관리자 계정 'admin'이 생성되었습니다.`
+- ⬜ 서버 재시작 후 중복 생성 없음 확인 (직접 확인 필요)
+  - 확인 방법: `sqlite3 data/app.db "SELECT username, role FROM users;"`
 
-#### 로그인 화면 UI 검증 (http://localhost:3000/login)
+#### 로그인 화면 UI 검증 (Playwright 자동 검증 완료)
 
-- ⬜ 로그인 폼 정상 렌더링 확인 (아이디 입력, 비밀번호 입력, 로그인 버튼)
-- ⬜ 빈 입력 상태에서 로그인 버튼 클릭 시 유효성 오류 메시지 표시 확인
-- ⬜ 아이디 4자 미만 입력 시 오류 메시지 표시 확인 ("아이디는 4자 이상이어야 합니다" 또는 유사)
-- ⬜ 비밀번호 8자 미만 입력 시 오류 메시지 표시 확인
-- ⬜ Enter 키로 로그인 버튼 기능 작동 확인
-- ⬜ 브라우저 콘솔(F12) 에러 없음 확인
+- ✅ 로그인 폼 정상 렌더링 (아이디 입력, 비밀번호 입력, 로그인 버튼)
+- ✅ 빈 입력 → "아이디를 입력해 주세요.", "비밀번호를 입력해 주세요." 오류 표시
+- ✅ 아이디 "ab" 입력 → "아이디는 4~20자의 영소문자, 숫자, 밑줄(_)만 사용할 수 있습니다." 오류
+- ✅ 비밀번호 7자 입력 → "비밀번호는 8자 이상이어야 합니다." 오류
+- ✅ 유효한 입력 → 로딩 표시 후 "아이디 또는 비밀번호가 올바르지 않습니다." (API 미연결 정상)
+- ✅ `?expired=true` → "세션이 만료되었습니다. 다시 로그인해 주세요." 표시
+- ✅ 브라우저 콘솔 에러 없음 (404 /api/auth/login은 Sprint 2 예정)
+- ⬜ Enter 키 동작 확인 (수동 필요)
 
 #### 반응형 레이아웃 검증
 
-- ⬜ 모바일 뷰포트(360px) 레이아웃 정상 확인
-  - 개발자 도구 > 반응형 모드에서 360px 설정 후 확인
-  - 폼이 가로 전체 너비로 표시되고 요소가 잘리지 않음
+- ✅ 모바일 뷰포트(360px) 레이아웃 정상 (스크린샷: screenshot-mobile-360px.png)
 
-#### Playwright MCP 검증 시나리오 (선택, 앱 실행 중일 때 수행)
+#### Vercel 프로덕션 검증
 
-> 아래 시나리오는 `http://localhost:3000` 이 실행 중인 상태에서 sprint-close 에이전트가 자동 수행하거나 직접 수행할 수 있습니다.
-
-1. `http://localhost:3000/login` 접속 후 폼 요소 존재 확인
-2. 로그인 버튼 클릭 (빈 입력) → 유효성 오류 메시지 확인
-3. 아이디 필드에 "ab" 입력 후 로그인 클릭 → 아이디 유효성 오류 확인
-4. 콘솔 에러 없음 확인
-5. 360px 뷰포트 → 모바일 레이아웃 정상 확인
+- ✅ 배포 URL: https://domain-dictionary-iota.vercel.app
+- ✅ `/login` 로그인 폼 정상 렌더링 확인 (Playwright)
 
 ---
 
@@ -111,5 +105,6 @@ npm run dev
 
 - Next.js 버전: ROADMAP 명세는 v15이나 실제 설치 버전은 v16.1.6 (최신 stable)
 - `drizzle/` 디렉터리: 현재 마이그레이션 파일 미생성 (`db:push`로 직접 적용됨)
+- Vercel 환경: SQLite는 ephemeral filesystem으로 제한됨. instrumentation.ts에서 VERCEL=1 환경에서 시딩 스킵 처리됨 (Sprint 2에서 영구 DB 전략 결정 필요)
 - 로그인 API 연동은 Sprint 2에서 수행 예정 (현재 UI만 구현)
 - `.NET` 잔여 파일(src/, tests/, MailTermAnalyzer.slnx 등) 정리 완료
