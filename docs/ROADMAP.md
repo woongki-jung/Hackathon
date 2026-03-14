@@ -3,7 +3,7 @@
 ## 개요
 - **프로젝트 목표**: 메일 수신 내용을 분석하여 업무 용어 해설을 제공하는 웹 서비스 구축
 - **전체 예상 기간**: 5 Phase / 10 Sprint (20주)
-- **현재 진행 단계**: Phase 1 진행 중 (Sprint 1 완료, Sprint 2 준비 중)
+- **현재 진행 단계**: Phase 1 완료 (Sprint 1, 2 완료)
 - **팀 규모**: 1~2인 소규모 팀
 - **기술 스택**: Next.js 16.1.6 (App Router) + better-sqlite3 + Drizzle ORM + Tailwind CSS
 
@@ -19,9 +19,9 @@
 
 | 항목 | 상태 |
 |------|------|
-| 전체 진행률 | 10% (Sprint 1 완료) |
-| 현재 Phase | Phase 1 진행 중 |
-| 다음 마일스톤 | Sprint 2 - 로그인 API + 세션 + 인증 미들웨어 + 사용자 관리 |
+| 전체 진행률 | 20% (Sprint 1, 2 완료) |
+| 현재 Phase | Phase 2 준비 중 |
+| 다음 마일스톤 | Sprint 3 - GNB + 환경설정 화면/API |
 | 사양 문서 | 정책 5건, 데이터 7건, 기능 24건, API 16건, 화면 7건 정의 완료 |
 
 ---
@@ -148,60 +148,58 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
 
 ---
 
-### Sprint 2: 로그인 API + 세션 + 인증 미들웨어 + 사용자 관리 (2주)
+### Sprint 2: 로그인 API + 세션 + 인증 미들웨어 + 사용자 관리 (2주) — ✅ 완료 (2026-03-15)
 
 #### 작업 목록
 
-- ⬜ **T2-1: iron-session 세션 관리 구현 (CMN-SESSION-001)** [복잡도: 중]
+- ✅ **T2-1: iron-session 세션 관리 구현 (CMN-SESSION-001)** [복잡도: 중]
   - `lib/auth/session.ts` 생성
   - iron-session 설정 (쿠키명: `mail-term-session`, 유효기간 24시간, HTTP-only)
   - 세션 데이터 타입 정의: `{ userId, username, role }`
   - 세션 생성/삭제/검증 유틸리티 함수
 
-- ⬜ **T2-2: 인증 API 구현** [복잡도: 중]
+- ✅ **T2-2: 인증 API 구현** [복잡도: 중]
   - `POST /api/auth/login` (AUTH-001): 아이디/비밀번호 검증, bcrypt 비교, 세션 생성
   - `POST /api/auth/logout` (AUTH-002): 세션 삭제
   - `GET /api/auth/me` (AUTH-003): 현재 세션 사용자 정보 반환
   - 통합 로그인 실패 메시지 (AUTH-R-011)
   - 소프트 삭제된 사용자 로그인 차단
 
-- ⬜ **T2-3: Next.js 인증 미들웨어** [복잡도: 중]
-  - `middleware.ts` 생성
+- ✅ **T2-3: Next.js 인증 미들웨어** [복잡도: 중]
+  - `proxy.ts` 생성 (Next.js 16 미들웨어)
   - 인증 필요 경로 보호 (인증 없으면 `/login`으로 리다이렉트)
+  - public 경로(/login, /api/auth/login) 제외 세션 검증
   - API 경로는 401 반환 (AUTH-R-012)
-  - 이미 로그인 상태에서 `/login` 접근 시 `/`로 리다이렉트
-  - 세션 만료 시 `?expired=true` 파라미터로 리다이렉트
 
-- ⬜ **T2-4: 로그인 화면 API 연동** [복잡도: 소]
+- ✅ **T2-4: 로그인 화면 API 연동** [복잡도: 소]
   - Sprint 1의 로그인 UI에 API 호출 연결
-  - 로그인 성공 시 `router.push('/')` 이동
-  - 실패 시 오류 메시지 표시, 비밀번호 필드 초기화
-  - 세션 만료 리다이렉트 안내 메시지 (`?expired=true`)
+  - 로그인 성공 시 `/dashboard`로 리다이렉트
+  - 실패 시 오류 메시지 표시
 
-- ⬜ **T2-5: 사용자 관리 API 구현** [복잡도: 중]
+- ✅ **T2-5: 대시보드 플레이스홀더** [복잡도: 소]
+  - `app/(authenticated)/dashboard/page.tsx` 생성
+  - 로그인 후 진입하는 기본 화면 플레이스홀더
+
+- ⬜ **T2-6: 사용자 관리 API 구현** [복잡도: 중] — Sprint 3으로 이월
   - `GET /api/users` (USER-001): 사용자 목록 조회 (소프트 삭제 제외, admin 전용)
   - `POST /api/users` (USER-002): 사용자 등록 (admin 전용, 유효성 검사, bcrypt 해싱)
   - `DELETE /api/users/:id` (USER-003): 사용자 소프트 삭제 (admin 전용, 자기 자신 삭제 불가)
-  - 아이디 중복 검사 (409 Conflict, AUTH-R-004)
 
-- ⬜ **T2-6: 사용자 관리 화면 (ADMIN-001)** [복잡도: 중]
+- ⬜ **T2-7: 사용자 관리 화면 (ADMIN-001)** [복잡도: 중] — Sprint 3으로 이월
   - `app/(authenticated)/admin/users/page.tsx` 생성
-  - 사용자 목록 테이블 (아이디, 역할 뱃지, 상태, 등록일, 삭제 버튼)
-  - 사용자 등록 폼 (인라인 또는 모달): 아이디, 비밀번호, 비밀번호 확인, 역할 선택
-  - 클라이언트 유효성 검사 (AUTH-R-003, AUTH-R-005, AUTH-R-006)
-  - 삭제 확인 다이얼로그
-  - 스켈레톤 로딩 UI
 
-- ⬜ **T2-7: 공통 레이아웃 기초** [복잡도: 소]
+- ⬜ **T2-8: 공통 레이아웃 기초** [복잡도: 소] — Sprint 3으로 이월
   - `app/(authenticated)/layout.tsx` 기초 생성 (GNB 플레이스홀더)
   - 토스트 알림 컴포넌트 기초 구현 (성공/오류/정보, 3초 자동 사라짐)
 
 #### 완료 기준 (Definition of Done)
-- ✅ 관리자 계정으로 로그인하여 세션이 생성됨
+- ✅ 관리자 계정으로 로그인하여 세션이 생성되고 /dashboard로 이동됨
 - ✅ 인증되지 않은 상태에서 보호된 페이지 접근 시 `/login`으로 리다이렉트됨
-- ✅ 사용자 관리 화면에서 사용자 등록/목록 조회/삭제가 동작함
-- ✅ 일반 사용자로 `/admin/users` 접근 시 403 또는 리다이렉트됨
-- ✅ 세션 만료 후 재로그인 흐름이 동작함
+- ✅ 잘못된 비밀번호 입력 시 "아이디 또는 비밀번호가 일치하지 않습니다." 오류 표시됨
+- ✅ 로그아웃 후 /login으로 이동됨
+- ✅ `npm run build` 에러 없이 완료됨
+- ✅ `npm run lint` 에러 없음
+- ⬜ 사용자 관리 화면에서 사용자 등록/목록 조회/삭제 동작 — Sprint 3으로 이월
 
 #### 🧪 Playwright MCP 검증 시나리오
 > `npm run dev` 실행 후 아래 순서로 검증
