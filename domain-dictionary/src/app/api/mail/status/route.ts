@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { mailProcessingLogs } from '@/db/schema';
 import { sessionOptions, type SessionData } from '@/lib/auth/session';
 import { getAllSettings } from '@/lib/config/settings-service';
+import { isSchedulerRunning } from '@/lib/scheduler/cron-scheduler';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -34,8 +35,7 @@ export async function GET() {
       success: true,
       data: {
         scheduler: {
-          // 스케줄러는 Sprint 5에서 구현 예정 — 현재는 항상 stopped
-          status: 'stopped' as const,
+          status: isSchedulerRunning() ? 'running' : 'stopped',
           checkInterval: settings['mail.check_interval'] ? Number(settings['mail.check_interval']) : null,
         },
         mail: {
