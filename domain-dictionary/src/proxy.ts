@@ -36,7 +36,7 @@ export async function proxy(request: NextRequest) {
           { status: 401 }
         );
       }
-      return NextResponse.redirect(new URL('/login?expired=true', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
 
     return response;
@@ -47,7 +47,7 @@ export async function proxy(request: NextRequest) {
         { status: 401 }
       );
     }
-    return NextResponse.redirect(new URL('/login?expired=true', request.url));
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 }
 
