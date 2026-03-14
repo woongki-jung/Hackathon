@@ -39,6 +39,7 @@ Sprint 1에서 구현한 로그인 UI에 실제 인증 API를 연결하고, iron
 
 - [Playwright 테스트 보고서](sprint2/test-report.md)
 - [배포/검증 체크리스트](sprint2/deploy.md)
+- [코드 리뷰 보고서](sprint2/code-review.md)
 
 ## PR
 
