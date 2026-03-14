@@ -20,7 +20,10 @@
       "Read(//c/Users/woongs1015/scoop/**)",
       "Bash(gh pr:*)",
       "Bash(gh auth:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__plugin_playwright_playwright__browser_evaluate"
     ]
   }
 }
