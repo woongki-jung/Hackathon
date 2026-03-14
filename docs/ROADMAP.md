@@ -19,9 +19,9 @@
 
 | 항목 | 상태 |
 |------|------|
-| 전체 진행률 | 40% (Sprint 1, 2, 3, 4 완료) |
-| 현재 Phase | Phase 2 완료, Phase 3 진행 예정 |
-| 다음 마일스톤 | Sprint 5 - 메일 수신 + 파일 저장 + 스케줄러 |
+| 전체 진행률 | 50% (Sprint 1, 2, 3, 4, 5 완료) |
+| 현재 Phase | Phase 3 진행 중 (Sprint 5 완료) |
+| 다음 마일스톤 | Sprint 6 - 용어 분석 파이프라인 (Gemini API 연동) |
 | 사양 문서 | 정책 5건, 데이터 7건, 기능 24건, API 16건, 화면 7건 정의 완료 |
 
 ---
@@ -408,22 +408,22 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
 
 ---
 
-### Sprint 5: 메일 수신 + 파일 저장 + 스케줄러 (2주)
+### Sprint 5: 메일 수신 + 파일 저장 + 스케줄러 (2주) — ✅ 완료 (2026-03-15)
 
 #### 작업 목록
 
-- ⬜ **T5-1: 파일 시스템 관리 기능 (CMN-FS-001)** [복잡도: 소]
+- ✅ **T5-1: 파일 시스템 관리 기능 (CMN-FS-001)** [복잡도: 소]
   - `lib/fs/file-manager.ts` 생성
   - 파일 읽기/쓰기/삭제, 디렉터리 보장 (존재하지 않으면 생성)
   - 경로 보안 검증 (디렉터리 탈출 방지)
   - `./data/mails/`, `./data/terms/` 경로 초기화
 
-- ⬜ **T5-2: HTTP 재시도 기능 (CMN-HTTP-001)** [복잡도: 소]
+- ✅ **T5-2: HTTP 재시도 기능 (CMN-HTTP-001)** [복잡도: 소]
   - `lib/http/retry.ts` 생성
   - 지수 백오프 재시도 (최대 3회, 1s/2s/4s 대기)
   - 외부 API 호출 시 사용 (Claude API, IMAP 연결)
 
-- ⬜ **T5-3: IMAP 메일 수신 기능 (MAIL-RECV-001)** [복잡도: 높음]
+- ✅ **T5-3: IMAP 메일 수신 기능 (MAIL-RECV-001)** [복잡도: 높음]
   - `lib/mail/imap-receiver.ts` 생성
   - imapflow로 IMAP 서버 접속 (SSL/TLS 필수)
   - INBOX에서 UNSEEN 메일 목록 조회
@@ -431,22 +431,22 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
   - 접속 실패 시 에러 반환 (SERVICE_UNAVAILABLE)
   - 환경변수에서 IMAP 인증 정보 조회
 
-- ⬜ **T5-4: 메일 내용 추출 기능 (MAIL-PROC-001)** [복잡도: 중]
+- ✅ **T5-4: 메일 내용 추출 기능 (MAIL-PROC-001)** [복잡도: 중]
   - `lib/mail/mail-parser.ts` 생성
   - 메일 제목/본문 텍스트 추출
   - HTML-to-Text 변환 (html-to-text 패키지)
   - 첨부파일 무시 (텍스트 본문만 대상)
 
-- ⬜ **T5-5: 분석 요청 파일 생성 기능 (DATA-FILE-001)** [복잡도: 소]
+- ✅ **T5-5: 분석 요청 파일 생성 기능 (DATA-FILE-001)** [복잡도: 소]
   - `lib/data/analysis-file.ts` 생성
   - 메일 텍스트를 `./data/mails/{timestamp}_{uid}.txt` 형식으로 저장
   - analysis_queue 테이블에 pending 상태로 등록
 
-- ⬜ **T5-6: 메일 상태 갱신 기능 (MAIL-PROC-002)** [복잡도: 소]
+- ✅ **T5-6: 메일 상태 갱신 기능 (MAIL-PROC-002)** [복잡도: 소]
   - IMAP SEEN 플래그 설정
   - mail_processing_logs 테이블에 수신 이력 기록
 
-- ⬜ **T5-7: 백그라운드 스케줄러 (SCHED-001)** [복잡도: 중]
+- ✅ **T5-7: 백그라운드 스케줄러 (SCHED-001)** [복잡도: 중]
   - `lib/scheduler/cron-scheduler.ts` 생성
   - `instrumentation.ts`에서 서버 시작 시 초기화
   - node-cron 기반 주기적 실행 (MAIL_CHECK_INTERVAL)
@@ -454,7 +454,7 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
   - 싱글톤 패턴, `global.__scheduler` HMR 중복 방지
   - Graceful Shutdown (process.on('SIGTERM'))
 
-- ⬜ **T5-8: 처리 완료 파일 관리 기능 (DATA-FILE-002)** [복잡도: 소]
+- ✅ **T5-8: 처리 완료 파일 관리 기능 (DATA-FILE-002)** [복잡도: 소]
   - 30일 경과 메일 임시 파일 삭제
   - 90일 경과 mail_processing_logs 하드 삭제
 
