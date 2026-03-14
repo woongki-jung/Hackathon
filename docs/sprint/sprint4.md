@@ -2,7 +2,7 @@
 
 - **기간**: 2026-03-15 ~ 2026-03-28 (2주)
 - **브랜치**: sprint4
-- **상태**: ⬜ 예정
+- **상태**: ✅ 완료 (2026-03-15)
 
 ---
 
@@ -562,13 +562,13 @@ const [statusRes, latestRes, historyRes, meRes] = await Promise.all([...]);
 
 ## 완료 기준 (Definition of Done)
 
-- ⬜ 대시보드에서 서비스 상태(스케줄러, IMAP, API 키)가 표시됨
-- ⬜ IMAP/API 키 미설정 시 경고 배너가 표시됨
-- ⬜ 분석 이력이 있을 때 최신 결과와 이력 목록이 표시됨
-- ⬜ 분석 이력이 없을 때 빈 상태가 적절히 표시됨
-- ⬜ 수동 메일 확인 버튼이 admin에게만 표시되고, 클릭 시 트리거됨
-- ⬜ `npm run build` 에러 없이 완료됨
-- ⬜ `npm run lint` 에러 없음
+- ✅ 대시보드에서 서비스 상태(스케줄러, IMAP, API 키)가 표시됨
+- ✅ IMAP/API 키 미설정 시 경고 배너가 표시됨
+- ✅ 분석 이력이 있을 때 최신 결과와 이력 목록이 표시됨
+- ✅ 분석 이력이 없을 때 빈 상태가 적절히 표시됨
+- ✅ 수동 메일 확인 버튼이 admin에게만 표시되고, 클릭 시 트리거됨
+- ✅ `npm run build` 에러 없이 완료됨
+- ✅ `npm run lint` 에러 없음
 
 ---
 
@@ -586,6 +586,12 @@ const [statusRes, latestRes, historyRes, meRes] = await Promise.all([...]);
 - ⬜ 경고 배너 표시 확인 (IMAP/API 키 미설정 상태에서)
 - ⬜ 수동 메일 확인 버튼 클릭 → confirm 다이얼로그 → 토스트 확인
 - ⬜ 일반 사용자(user role) 로그인 후 메일 확인 버튼 숨김 확인
+
+## 검증 결과
+
+- [코드 리뷰 보고서](sprint4/code-review.md)
+- [Playwright 테스트 보고서](sprint4/test-report.md)
+- [배포 체크리스트](sprint4/deploy.md)
 
 ---
 
