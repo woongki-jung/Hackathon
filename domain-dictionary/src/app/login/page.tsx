@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { validateUsername } from '@/lib/validators/auth';
@@ -11,6 +11,7 @@ interface FormErrors {
 }
 
 function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const isExpired = searchParams.get('expired') === 'true';
 
@@ -44,17 +45,19 @@ function LoginForm() {
 
     setIsLoading(true);
     try {
-      // Sprint 2에서 실제 API 연결 예정
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setServerError(data.message || '아이디 또는 비밀번호가 올바르지 않습니다.');
+      if (response.ok) {
+        router.replace('/dashboard');
+        return;
       }
+
+      const data = await response.json().catch(() => ({}));
+      setServerError(data.message || '아이디 또는 비밀번호가 올바르지 않습니다.');
     } catch {
       setServerError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
