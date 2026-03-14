@@ -1,271 +1,194 @@
-# 용어 분석 서비스 인터페이스 정의
+# Analysis API 정의
 
 ## 개요
-
-- 본 문서는 앱 내부의 용어 분석 서비스 계층 인터페이스를 정의한다.
-- 용어 분석 서비스는 분석 요청 폴더의 파일을 읽어 업무 용어를 추출하고, Claude API를 통해 해설을 생성하여 용어 사전에 등록한다.
-- 관련 정책: POL-TERM, POL-DATA (DATA-04, DATA-06)
-- 관련 외부 API: api_claude.md (CLAUDE-001)
-- 관련 내부 API: api_dictionary.md (DICT-003)
+- 메일 분석 결과(요약, 후속 작업 제안)를 조회하는 API를 정의한다.
+- 프론트엔드 "업무지원" 페이지에서 사용한다.
+- 관련 도메인 객체: AnalysisQueue (DATA-007)
+- 관련 기능: VIEW-STATE-001 (앱 상태 정보 조회)
+- 관련 정책: POL-UI (UI-R-008, UI-R-016)
 
 ---
 
-## ANAL-001: 배치 분석 실행
+## ANAL-001 최신 분석 결과 조회
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 유형 | 내부 서비스 호출 (주기적 또는 이벤트 트리거) |
-| 설명 | 분석 요청 폴더에 있는 미처리 파일을 일괄적으로 분석한다 |
-| 트리거 | 메일 수신 완료 이벤트 또는 수동 실행 |
+| 메서드 | GET |
+| 경로 | /api/analysis/latest |
+| 인증 | 필요 |
+| 권한 | all (admin, user) |
+| 설명 | 가장 최근 완료된 메일 분석 결과를 조회한다 |
 
-### 입력
+### 요청
 
-없음 (분석 요청 폴더 경로는 환경설정에서 자동으로 가져옴)
+파라미터 없음.
 
-### 처리 흐름
+#### 요청 예시
+```http
+GET /api/analysis/latest HTTP/1.1
+Cookie: mail-term-session=...
+```
 
-1. 분석 요청 폴더(`storage.analysisDir`)에서 미처리 `.txt` 파일 목록을 조회한다
-2. 파일 생성 시간 기준 오름차순으로 정렬한다 (TERM-05)
-3. 최대 10개 파일을 선택한다 (TERM-05)
-4. 각 파일에 대해:
-   a. 파일 내용을 파싱한다 (YAML frontmatter + 본문)
-   b. 용어 추출을 수행한다 (ANAL-002)
-   c. 신규 용어에 대해 해설 생성을 요청한다 (ANAL-003)
-   d. 추출된 용어를 사전에 등록/갱신한다 (DICT-003)
-   e. 처리 완료된 파일을 `Processed/` 디렉터리로 이동한다 (DATA-06)
-5. 분석 결과를 반환한다
+### 응답
 
-### 출력
-
+#### 성공 응답 (200 OK)
 ```json
 {
   "success": true,
-  "filesProcessed": 3,
-  "termsExtracted": 15,
-  "newTerms": 8,
-  "updatedTerms": 7,
-  "apiCallsUsed": 8,
-  "errors": []
+  "data": {
+    "id": "770e8400-e29b-41d4-a716-446655440010",
+    "mailSubject": "[긴급] EMR 시스템 업데이트 안내",
+    "mailReceivedAt": "2026-03-15T08:30:00Z",
+    "summary": "EMR 시스템 v3.2 업데이트가 3월 20일 예정되어 있으며, 주요 변경사항으로 처방전 모듈 개선과 진료기록 연동 API 변경이 포함됩니다.",
+    "actionItems": [
+      "3월 20일 업데이트 일정 확인 및 팀 공유",
+      "진료기록 연동 API 변경사항 개발팀 전달",
+      "업데이트 전 데이터 백업 계획 수립",
+      "테스트 환경에서 사전 검증 일정 확보"
+    ],
+    "extractedTermCount": 8,
+    "analyzedAt": "2026-03-15T10:01:30Z"
+  }
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| success | boolean | 전체 처리 성공 여부 |
-| filesProcessed | integer | 처리된 파일 수 |
-| termsExtracted | integer | 추출된 총 용어 수 |
-| newTerms | integer | 신규 등록된 용어 수 |
-| updatedTerms | integer | 기존 용어 갱신 수 (source_count 증가) |
-| apiCallsUsed | integer | 이번 배치에서 사용된 Claude API 호출 수 |
-| errors | array | 오류 상세 목록 |
+| id | string | 분석 대기열 레코드 UUID |
+| mailSubject | string / null | 메일 제목 |
+| mailReceivedAt | string / null | 메일 수신 일시 (ISO 8601) |
+| summary | string | 메일 핵심 내용 요약 (최대 500자, TERM-R-010) |
+| actionItems | string[] | 후속 작업 제안 목록 (최대 5개, TERM-R-011) |
+| extractedTermCount | number | 추출된 용어 수 |
+| analyzedAt | string | 분석 완료 일시 (ISO 8601) |
 
-### 에러
+#### 성공 응답 (200 OK) - 분석 결과 없음
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "분석 결과가 없습니다."
+}
+```
 
-| 에러 코드 | 설명 | 후속 조치 |
-|-----------|------|-----------|
-| NO_FILES | 분석할 파일이 없음 | 정상 종료 |
-| PARSE_ERROR | 파일 파싱 실패 | Error/ 디렉터리로 이동 (TERM-06) |
-| API_LIMIT_REACHED | 일일 API 호출 한도 초과 | 다음 날까지 해설 생성 보류 |
-| PARTIAL_FAILURE | 일부 용어 처리 실패 | 성공한 용어는 저장, 실패한 용어는 재시도 큐에 추가 (TERM-06) |
+> 분석 완료된 결과가 하나도 없는 경우 `data: null`로 응답한다.
+
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 |
+|-----------|-----------|------|
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 |
 
 ### 비즈니스 규칙
+- `analysis_queue` 테이블에서 `status = 'completed'`이고 `analyzed_at`이 가장 최신인 레코드 1건을 반환한다.
+- 업무지원 페이지 상단에 노출되는 데이터이다 (UI-R-008).
+- `actionItems`는 DB에 JSON 배열 문자열로 저장되어 있으며, 파싱하여 배열로 반환한다.
 
-- 1회 배치 처리 시 최대 10개 파일을 처리한다 (TERM-05).
-- 1회 배치당 최대 20건의 Claude API 호출로 제한한다 (TERM-05).
-- 일일 최대 API 호출 횟수(기본 200)를 초과하면 해설 생성을 다음 날로 보류한다 (POL-TERM).
-- 분석 완료된 파일은 `Processed/` 디렉터리로 이동한다 (DATA-06).
-- 파일 이동 실패 시 파일을 유지하되, 처리 완료 상태를 별도 메타 파일에 기록한다 (DATA-06).
-- 파일 파싱 실패 시 해당 파일을 `Error/` 디렉터리로 이동한다 (TERM-06).
+### 관련 기능
+- TERM-BATCH-001 (배치 분석 결과)
+- VIEW-STATE-001 (앱 상태 정보 조회)
 
 ---
 
-## ANAL-002: 용어 추출
+## ANAL-002 분석 이력 조회
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 텍스트에서 업무 용어(EMR, 비즈니스, 약어)를 추출한다 |
+| 메서드 | GET |
+| 경로 | /api/analysis/history |
+| 인증 | 필요 |
+| 권한 | all (admin, user) |
+| 설명 | 이전 메일 분석 결과 이력을 목록으로 조회한다 (페이지네이션) |
 
-### 입력
+### 요청
 
-```json
-{
-  "subject": "OCS 시스템 업데이트 안내",
-  "bodyText": "OCS 시스템이 업데이트되어 처방 입력 화면이 변경됩니다. PACS 연동 모듈과 HL7 인터페이스도 함께 수정됩니다. DRG 수가 산정 모듈은 다음 릴리스에서 반영 예정입니다.",
-  "sourceFile": "20260313_143022_a1b2c3d4.txt"
-}
+#### Query Parameters
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| page | number | ❌ | 1 | 페이지 번호 (1부터 시작) |
+| limit | number | ❌ | 20 | 페이지당 항목 수 (최대 100) |
+| status | string | ❌ | - | 상태 필터 (`completed` / `failed` / `pending` / `processing`) |
+
+#### 요청 예시
+```http
+GET /api/analysis/history?page=1&limit=20&status=completed HTTP/1.1
+Cookie: mail-term-session=...
 ```
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| subject | string | ✅ | 메일 제목 |
-| bodyText | string | ✅ | 메일 본문 텍스트 |
-| sourceFile | string | ✅ | 출처 파일명 |
+### 응답
 
-### 출력
-
+#### 성공 응답 (200 OK)
 ```json
 {
-  "terms": [
-    {
-      "term": "OCS",
-      "category": "EMR",
-      "context": "OCS 시스템이 업데이트되어 처방 입력 화면이 변경됩니다",
-      "occurrences": 1
-    },
-    {
-      "term": "PACS",
-      "category": "EMR",
-      "context": "PACS 연동 모듈과 HL7 인터페이스도 함께 수정됩니다",
-      "occurrences": 1
-    },
-    {
-      "term": "HL7",
-      "category": "EMR",
-      "context": "PACS 연동 모듈과 HL7 인터페이스도 함께 수정됩니다",
-      "occurrences": 1
-    },
-    {
-      "term": "DRG",
-      "category": "Business",
-      "context": "DRG 수가 산정 모듈은 다음 릴리스에서 반영 예정입니다",
-      "occurrences": 1
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "770e8400-e29b-41d4-a716-446655440010",
+        "fileName": "1710489000000_a1b2c3d4.txt",
+        "mailSubject": "[긴급] EMR 시스템 업데이트 안내",
+        "mailReceivedAt": "2026-03-15T08:30:00Z",
+        "status": "completed",
+        "summary": "EMR 시스템 v3.2 업데이트가 3월 20일 예정...",
+        "actionItems": [
+          "3월 20일 업데이트 일정 확인 및 팀 공유",
+          "진료기록 연동 API 변경사항 개발팀 전달"
+        ],
+        "extractedTermCount": 8,
+        "analyzedAt": "2026-03-15T10:01:30Z",
+        "createdAt": "2026-03-15T10:00:00Z"
+      },
+      {
+        "id": "770e8400-e29b-41d4-a716-446655440011",
+        "fileName": "1710402600000_e5f6g7h8.txt",
+        "mailSubject": "월간 보고서 검토 요청",
+        "mailReceivedAt": "2026-03-14T14:00:00Z",
+        "status": "completed",
+        "summary": "3월 월간 보고서 검토 요청으로...",
+        "actionItems": [
+          "보고서 내용 검토 후 피드백 회신"
+        ],
+        "extractedTermCount": 5,
+        "analyzedAt": "2026-03-14T15:02:00Z",
+        "createdAt": "2026-03-14T15:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 42,
+      "totalPages": 3
     }
-  ],
-  "totalCount": 4
+  }
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| terms | array | 추출된 용어 목록 |
-| terms[].term | string | 용어 원문 |
-| terms[].category | string | 분류 (`EMR`, `Business`, `Abbreviation`) |
-| terms[].context | string | 발견 컨텍스트 (용어 전후 200자) |
-| terms[].occurrences | integer | 해당 문서 내 출현 횟수 |
-| totalCount | integer | 추출된 총 용어 수 |
+| items[].id | string | 분석 대기열 레코드 UUID |
+| items[].fileName | string | 메일 임시 파일명 |
+| items[].mailSubject | string / null | 메일 제목 |
+| items[].mailReceivedAt | string / null | 메일 수신 일시 |
+| items[].status | string | 분석 상태 (`pending` / `processing` / `completed` / `failed`) |
+| items[].summary | string / null | 메일 요약 (completed인 경우에만) |
+| items[].actionItems | string[] / null | 후속 작업 목록 (completed인 경우에만) |
+| items[].extractedTermCount | number | 추출된 용어 수 |
+| items[].analyzedAt | string / null | 분석 완료 일시 |
+| items[].createdAt | string | 대기열 등록 일시 |
+| pagination | object | 페이지네이션 정보 |
 
-### 추출 규칙 (TERM-01, TERM-02)
-
-| 패턴 | 설명 | 예시 |
-|------|------|------|
-| `[A-Z]{2,}` | 대문자 약어 (2글자 이상 연속 대문자) | OCS, PACS, EMR |
-| 영문+숫자 조합 | 코드성 용어 | ICD-10, HL7v2 |
-| 한글 전문 용어 | 사용자 등록 패턴 목록과 매칭 | 수가, 원외처방 |
-
-### 제외 규칙
-
-- 불용어 목록에 포함된 약어는 제외 (IT, OK, PM, AM 등)
-- 2글자 미만의 단독 문자열은 제외
-- 일반적인 영어 단어, 관사, 전치사는 제외
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 |
+|-----------|-----------|------|
+| 400 | INVALID_REQUEST | page/limit 값 유효성 오류 |
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 |
 
 ### 비즈니스 규칙
+- 기본 정렬: `analyzed_at` 또는 `created_at` 기준 최신순(내림차순) (UI-R-016).
+- `status` 필터를 지정하지 않으면 모든 상태의 이력을 반환한다.
+- `actionItems`는 DB의 JSON 배열 문자열을 파싱하여 반환한다. 파싱 실패 시 빈 배열을 반환한다.
+- 분석 결과는 영구 보존한다 (POL-DATA DATA-R-018).
 
-- 파일당 최대 50개 용어를 추출한다. 초과 시 출현 빈도순 상위 50개를 선택한다 (TERM-05).
-- 불용어 목록은 사용자가 편집 가능한 설정 파일로 관리한다 (TERM-02).
-- 컨텍스트는 해당 용어 전후 200자를 포함한다 (TERM-03).
-
----
-
-## ANAL-003: 해설 생성 요청
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 추출된 용어 목록에 대해 Claude API를 호출하여 해설을 생성한다 |
-
-### 입력
-
-```json
-{
-  "terms": [
-    {
-      "term": "OCS",
-      "category": "EMR",
-      "context": "OCS 시스템이 업데이트되어 처방 입력 화면이 변경됩니다"
-    },
-    {
-      "term": "DRG",
-      "category": "Business",
-      "context": "DRG 수가 산정 기준이 변경되어 원무과 확인 바랍니다"
-    }
-  ]
-}
-```
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| terms | array | ✅ | 해설을 생성할 용어 목록 |
-| terms[].term | string | ✅ | 용어 원문 |
-| terms[].category | string | ✅ | 분류 |
-| terms[].context | string | ✅ | 발견 컨텍스트 |
-
-### 처리 흐름
-
-1. 입력된 용어 중 이미 사전에 등록된 용어를 필터링한다 (TERM-03)
-2. 일일 API 호출 잔여 횟수를 확인한다
-3. 신규 용어를 Claude API 호출용 프롬프트로 구성한다 (CLAUDE-001 참조)
-4. Claude API를 호출하여 해설을 수신한다
-5. 응답을 파싱하여 구조화된 해설 데이터를 반환한다
-
-### 출력
-
-```json
-{
-  "results": [
-    {
-      "term": "OCS",
-      "summary": "처방전달시스템(Order Communication System)",
-      "description": "OCS는 의사가 입력한 처방을 약국, 검사실, 간호 부서 등으로 전자적으로 전달하는 병원 정보 시스템입니다.",
-      "relatedTerms": ["EMR", "CPOE", "처방전달"],
-      "status": "completed"
-    },
-    {
-      "term": "DRG",
-      "summary": "",
-      "description": "",
-      "relatedTerms": [],
-      "status": "failed",
-      "error": "API 호출 실패"
-    }
-  ],
-  "apiCallsUsed": 1,
-  "remainingDailyQuota": 195
-}
-```
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| results | array | 해설 생성 결과 목록 |
-| results[].term | string | 용어 원문 |
-| results[].summary | string | 1줄 요약 (50자 이내) |
-| results[].description | string | 상세 설명 (200자 이내) |
-| results[].relatedTerms | array of string | 관련 용어 목록 |
-| results[].status | string | 처리 상태 (`completed`, `failed`, `skipped`) |
-| results[].error | string (nullable) | 실패 시 오류 메시지 |
-| apiCallsUsed | integer | 사용된 API 호출 수 |
-| remainingDailyQuota | integer | 잔여 일일 API 호출 횟수 |
-
-### 에러
-
-| 에러 코드 | 설명 | 후속 조치 |
-|-----------|------|-----------|
-| API_AUTH_FAILED | Claude API 인증 실패 | API 키 확인 필요 |
-| API_RATE_LIMITED | Claude API Rate Limit 초과 | 지수 백오프 재시도 |
-| DAILY_LIMIT_REACHED | 일일 API 호출 한도 초과 | 다음 날까지 보류 |
-| PARSE_FAILED | API 응답 파싱 실패 | 텍스트를 description으로 저장 |
-
-### 비즈니스 규칙
-
-- 이미 사전에 등록된 용어는 해설을 재생성하지 않고 `skipped` 상태로 반환한다 (TERM-03).
-- 1회 배치당 최대 20건의 API 호출로 제한한다 (TERM-05).
-- API 호출 실패 시 지수 백오프로 재시도한다: 최대 3회, 1초/2초/4초 간격 (AUTH-04).
-- 해설 생성 실패 시 해당 용어를 "해설 미완료"(summary, description 비어 있음) 상태로 사전에 등록한다 (TERM-06).
-- 응답 텍스트가 유효한 JSON이 아닌 경우, 텍스트 전체를 description에 저장한다.
-- 해설 생성 시 환자 개인정보가 포함되지 않도록 프롬프트에서 필터링한다 (POL-TERM 제약사항).
+### 관련 기능
+- TERM-BATCH-001 (배치 분석 결과)

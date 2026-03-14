@@ -1,1 +1,1 @@
-- [project_function_architecture.md](project_function_architecture.md) - 메일 수신 용어 해설 도구의 기능 아키텍처 (공통 7개 + 도메인 17개, 의존성 구조)
+- [project_function_architecture.md](project_function_architecture.md) - 메일 수신 용어 해설 웹 서비스의 기능 아키텍처 (Next.js 15, 공통 6개 + 도메인 18개, 의존성 구조)

@@ -1,124 +1,128 @@
 # 배치 분석 오케스트레이션 기능 정의
 
 ## 개요
-
-- **기능 목적**: 분석 요청 폴더의 파일을 일괄 처리하는 전체 흐름을 제어한다. 파일 로드 -> 용어 추출 -> 분류 -> 해설 생성 -> 사전 등록 -> 완료 처리의 파이프라인을 오케스트레이션한다.
-- **적용 범위**: 메일 수신 후 또는 주기적으로 실행되는 배치 처리의 진입점.
+- 분석 대기열(analysis_queue)에 등록된 메일 파일의 전체 분석 파이프라인을 순차 조율하는 기능을 정의한다.
+- 적용 범위: 백그라운드 스케줄러에서 주기적으로 호출되는 메일 수신~분석 전체 흐름
 
 ---
 
-## TERM-BATCH-001: 배치 분석 오케스트레이션
+## TERM-BATCH-001 배치 분석 오케스트레이션
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
 | 기능명 | 배치 분석 오케스트레이션 |
 | 분류 | 도메인 특화 로직 |
-| 레이어 | Application |
-| 트리거 | 메일 수신 완료 후 또는 별도 배치 스케줄 |
-| 관련 정책 | POL-TERM (TERM-05, TERM-06) |
+| 레이어 | lib/analysis |
+| 트리거 | SCHED-001 스케줄러에 의해 주기적 호출 |
+| 관련 정책 | POL-MAIL (MAIL-R-004 ~ MAIL-R-006), POL-TERM (TERM-R-001 ~ TERM-R-003, TERM-R-020, TERM-R-021) |
 
 ### 입력 / 출력
 
-#### 입력 (Input)
+#### runBatchAnalysis
 
-| 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
-|----------|------|------|------|-------------|
-| analysisDir | string | ✅ | 분석 요청 폴더 경로 | 존재하는 디렉터리 |
-| maxFilesPerBatch | int | | 1회 최대 처리 파일 수 | 기본값 10 (TERM-05) |
-| maxApiCallsPerBatch | int | | 1배치당 최대 API 호출 수 | 기본값 20 (TERM-05) |
+##### 입력 (Input)
+없음 (내부적으로 설정 및 대기열을 조회)
 
-#### 출력 (Output)
-
+##### 출력 (Output)
 | 항목 | 타입 | 설명 |
 |------|------|------|
-| processedFiles | int | 처리 완료 파일 수 |
-| newTerms | int | 신규 등록 용어 수 |
-| updatedTerms | int | 갱신된 용어 수 |
-| failedFiles | int | 처리 실패 파일 수 |
-| apiCallsUsed | int | 사용된 API 호출 수 |
+| mailReceiveResult | { count: number, status: string } | 메일 수신 결과 |
+| analysisResult | { processed: number, succeeded: number, failed: number } | 분석 결과 |
 
-#### 예외 / 오류
-
+##### 예외 / 오류
 | 조건 | 오류 코드 | 설명 |
 |------|-----------|------|
-| 디렉터리 미존재 | ERR_BATCH_DIR_NOT_FOUND | 분석 요청 폴더 없음 |
-| 전체 배치 실패 | ERR_BATCH_ALL_FAILED | 모든 파일 처리 실패 |
+| 이전 작업 진행 중 | SKIP_CONCURRENT | 중복 실행 건너뜀 (MAIL-R-006) |
 
 ### 처리 흐름
 
-1. **대상 파일 목록 조회**: analysisDir에서 `.txt` 파일을 생성 시간 오름차순으로 조회한다 (TERM-05).
-2. **상한 적용**: maxFilesPerBatch까지만 대상으로 한다 (TERM-05).
-3. **파일별 처리 루프**: 각 파일에 대해 다음을 수행한다.
-   a. **파일 파싱**: YAML frontmatter와 본문을 분리하여 로드한다.
-   b. **개인정보 필터링**: TERM-PII-001로 본문에서 개인정보를 제거한다.
-   c. **용어 추출**: TERM-EXT-001로 용어 후보를 추출한다.
-   d. **불용어 필터링**: TERM-EXT-002로 불용어를 제거한다.
-   e. **용어 분류**: TERM-CLS-001로 각 용어를 분류한다.
-   f. **사전 등록/갱신**: DATA-DICT-001로 용어를 사전에 등록한다.
-      - 신규 용어이고 API 호출 한도 내이면: TERM-GEN-001로 해설을 생성한다.
-      - 기존 용어이면: 발견 횟수만 갱신한다 (TERM-04).
-   g. **처리 완료**: DATA-FILE-002로 파일을 Processed 디렉터리로 이동한다.
-4. **실패 처리** (TERM-06):
-   - 파일 파싱 실패: 에러 로그 후 `Error/` 디렉터리로 이동.
-   - API 호출 실패: 해당 용어를 "해설 미완료"(description 비어 있음) 상태로 등록. 다음 배치에서 재시도.
-   - 부분 실패: 성공한 용어는 저장, 실패한 용어만 다음 배치에서 재시도.
-5. **알림 발송**: 신규 용어가 1건 이상이면 CMN-NOTI-001로 트레이 알림을 발송한다.
-6. **결과 반환**: 처리 통계를 반환한다.
-
 ```mermaid
 flowchart TD
-    A[배치 시작] --> B[대상 파일 목록 조회]
-    B --> C{파일 있음?}
-    C -- 아니오 --> D[종료]
-    C -- 예 --> E[파일 파싱]
-    E --> F{파싱 성공?}
-    F -- 아니오 --> G[Error 디렉터리로 이동]
-    G --> H{다음 파일?}
-    F -- 예 --> I[개인정보 필터링]
-    I --> J[용어 추출]
-    J --> K[불용어 필터링]
-    K --> L[용어 분류]
-    L --> M[사전 등록/갱신]
-    M --> N{신규 & API 한도 내?}
-    N -- 예 --> O[해설 생성]
-    N -- 아니오 --> P[건너뜀]
-    O --> Q{생성 성공?}
-    Q -- 아니오 --> R[해설 미완료로 등록]
-    Q -- 예 --> S[해설 포함 등록]
-    R --> T[Processed로 이동]
-    S --> T
-    P --> T
-    T --> H
-    H -- 예 --> E
-    H -- 아니오 --> U{신규 용어 있음?}
-    U -- 예 --> V[트레이 알림]
-    V --> W[결과 반환]
-    U -- 아니오 --> W
+    A[배치 시작] --> B{이전 작업 진행 중?}
+    B -- 예 --> C[건너뜀 로그 MAIL-R-006]
+    B -- 아니오 --> D[잠금 획득]
+    D --> E["Phase 1: 메일 수신"]
+    E --> E1[MAIL-RECV-001 IMAP 수신]
+    E1 --> E2[각 메일: MAIL-PROC-001 내용 추출]
+    E2 --> E3[각 메일: DATA-FILE-001 파일 저장]
+    E3 --> E4[각 메일: MAIL-PROC-002 상태 갱신]
+    E4 --> E5[수신 처리 로그 기록]
+    E5 --> F["Phase 2: 용어 분석"]
+    F --> F1[대기열에서 pending 파일 조회<br/>TERM-R-001]
+    F1 --> F2{파일 있음?}
+    F2 -- 아니오 --> G[분석 건너뜀]
+    F2 -- 예 --> F3[각 파일 순차 분석]
+    F3 --> F4[파일 읽기]
+    F4 --> F5[TERM-PII-001 개인정보 필터링]
+    F5 --> F6[TERM-EXT-001 용어 추출]
+    F6 --> F7[TERM-GEN-001 해설 생성]
+    F7 --> F8[DATA-DICT-001 용어 저장]
+    F8 --> F9[대기열 상태 갱신<br/>completed/failed]
+    F9 --> F3
+    G --> H["Phase 3: 정리"]
+    F3 --> H
+    H --> H1[DATA-FILE-002 만료 파일 삭제]
+    H1 --> H2[분석 처리 로그 기록]
+    H2 --> I[잠금 해제]
 ```
+
+### 분석 파이프라인 (파일 단위)
+
+```mermaid
+flowchart LR
+    A[파일 읽기] --> B[개인정보 필터링] --> C[용어 추출] --> D[해설 생성] --> E[용어 저장] --> F[상태 갱신]
+```
+
+### 대기열 상태 전이 (TERM-R-020)
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: 메일 수신 시 등록
+    pending --> processing: 분석 시작
+    processing --> completed: 분석 성공
+    processing --> failed: 분석 실패
+    failed --> pending: 재시도 (retry_count < 3)
+    failed --> [*]: retry_count >= 3 (확정 실패)
+```
+
+### 재시도 정책 (TERM-R-021)
+
+- 분석 실패 시 retry_count 증가
+- retry_count < 3이면 다음 주기에 pending으로 복귀하여 재시도
+- retry_count >= 3이면 failed 확정, 더 이상 재시도하지 않음
+
+### 중복 실행 방지 (MAIL-R-006)
+
+- 모듈 수준 변수(`isRunning`)로 잠금 관리
+- 이전 배치가 완료되지 않은 상태에서 스케줄러가 다시 호출하면 건너뜀
 
 ### 구현 가이드
 
-- **패턴**: Pipeline 패턴으로 각 단계를 조합. 각 단계는 독립적으로 테스트 가능한 기능.
-- **동시성**: 파일 처리는 순차적으로 수행한다 (API Rate Limit 고려). 배치 실행 중 다음 배치 요청이 오면 건너뛴다.
-- **성능**: 1배치당 API 호출 20건 제한으로 비용을 통제한다 (TERM-05).
-- **트랜잭션**: 파일 단위로 처리를 커밋한다. 한 파일의 실패가 다른 파일에 영향을 주지 않는다.
+- **패턴**: Orchestrator 패턴 - lib/analysis/batch-analyzer.ts
+- **순차 처리**: 메일 파일 분석은 순차 처리 (API rate limit 고려, POL-TERM 구현 가이드)
+- **트랜잭션**: 각 파일의 분석 결과 저장은 DB 트랜잭션으로 묶기
+- **중복 방지**: 모듈 레벨 잠금 변수 (MAIL-R-006)
+- **오류 격리**: 개별 파일 분석 실패가 전체 배치를 중단하지 않음
+- **외부 의존성**: 모든 하위 기능 (MAIL-RECV-001 ~ DATA-DICT-001)
 
 ### 관련 기능
+- **이 기능을 호출하는 기능**: SCHED-001
+- **이 기능이 호출하는 기능**: MAIL-RECV-001, MAIL-PROC-001, MAIL-PROC-002, DATA-FILE-001, DATA-FILE-002, TERM-EXT-001, TERM-GEN-001, TERM-PII-001, DATA-DICT-001, CMN-CFG-001, CMN-LOG-001
 
-- **이 기능을 호출하는 기능**: 메일 수신 완료 이벤트, 배치 스케줄러
-- **이 기능이 호출하는 기능**: TERM-PII-001, TERM-EXT-001, TERM-EXT-002, TERM-CLS-001, TERM-GEN-001, DATA-DICT-001, DATA-FILE-002, CMN-CFG-001, CMN-NOTI-001, CMN-LOG-001
+### 관련 데이터
+- DATA-007 AnalysisQueue (analysis_queue 테이블)
+- DATA-003 MailProcessingLog (처리 로그)
 
 ### 테스트 시나리오
 
 | 시나리오 | 입력 조건 | 기대 결과 |
 |----------|-----------|-----------|
-| 정상 배치 | 3개 파일, 각 5개 용어 | processedFiles=3, newTerms>0 |
-| 파일 수 상한 | 15개 파일 | 10개만 처리 |
-| API 호출 상한 | 25개 신규 용어 | 20개만 해설 생성, 5개 미완료 등록 |
-| 파싱 실패 | 잘못된 형식 파일 | Error 디렉터리 이동, failedFiles=1 |
-| 부분 실패 | 5개 중 2개 API 실패 | 3개 성공 등록, 2개 미완료 등록 |
-| 빈 디렉터리 | 처리 대상 파일 없음 | processedFiles=0 |
-| 중복 용어 | 기존 등록 용어 재발견 | updatedTerms 증가, API 미호출 |
-| 알림 발송 | 신규 용어 3건 | "3건의 새로운 용어가 추가되었습니다" 알림 |
+| 전체 정상 흐름 | 메일 3건, 모두 분석 성공 | mailCount=3, succeeded=3 |
+| 메일 없음 | UNSEEN 메일 0건 | mailCount=0, 분석 건너뜀 |
+| 일부 분석 실패 | 3건 중 1건 API 실패 | succeeded=2, failed=1 |
+| 중복 실행 방지 | 이전 배치 실행 중 | SKIP_CONCURRENT, 건너뜀 |
+| 재시도 성공 | retry_count=1인 파일 | 분석 성공, completed로 전환 |
+| 재시도 3회 소진 | retry_count=2인 파일, 또 실패 | failed 확정 |
+| IMAP 미설정 | IMAP 환경변수 없음 | 메일 수신 건너뜀, 기존 대기열만 분석 |
+| API 키 미설정 | ANTHROPIC_API_KEY 없음 | 메일 수신 후 분석 건너뜀 |

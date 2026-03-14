@@ -1,33 +1,41 @@
 ---
 name: API 설계 주요 결정 사항
-description: 메일 용어 해설 도구의 API 인터페이스 설계 시 내린 주요 결정 사항 및 구조
+description: 메일 용어 해설 웹 서비스의 REST API 인터페이스 설계 주요 결정 사항 (Next.js 15 App Router 기반)
 type: project
 ---
 
 ## API 인터페이스 구조
 
-데스크톱 앱이므로 자체 REST API 서버를 노출하지 않음. 인터페이스를 두 가지로 분류:
+Next.js 15 App Router Route Handlers (`app/api/`) 기반 REST API. Base URL: `/api`.
 
-1. **External API (외부 호출)**: 앱에서 외부 시스템을 호출하는 인터페이스
-   - Microsoft Graph API (GRAPH-001~005): OAuth 토큰, 메일 조회/읽음처리, 폴더 조회
-   - Anthropic Claude API (CLAUDE-001): 용어 해설 생성
+### API 그룹 및 코드 채번
 
-2. **Internal Service (내부 서비스 계층)**: 앱 내부 모듈 간 계약
-   - Config (CFG-001~003): 설정 읽기/저장/검증
-   - Mail (MAIL-001~003): 메일 수신/파일저장/이력관리
-   - Analysis (ANAL-001~003): 배치분석/용어추출/해설생성
-   - Dictionary (DICT-001~006): 검색/상세/등록갱신/인기용어/통계/백업
+| 그룹 | 접두사 | 엔드포인트 수 | 설명 |
+|------|--------|-------------|------|
+| Auth | AUTH- | 3 | 로그인/로그아웃/세션 조회 |
+| User | USER- | 3 | 사용자 CRUD (관리자 전용) |
+| Config | CFG- | 3 | 환경설정 조회/수정/메일 테스트 |
+| Mail | MAIL- | 2 | 서비스 상태/수동 트리거 |
+| Analysis | ANAL- | 2 | 최신/이력 분석 결과 |
+| Dictionary | DICT- | 3 | 검색/트렌드/상세 |
+| External | CLAUDE- | 1 | Claude API 호출 (서버 사이드) |
 
-**Why:** 데스크톱 앱은 클라이언트이므로 "호출하는 API"와 "내부 서비스 인터페이스"로 분리하는 것이 구현 시 모듈 간 결합도를 낮추는 데 유리함.
+**Why:** 웹 서비스이므로 클라이언트-서버 REST API 구조. 이전 .NET 데스크톱 앱 구조와 완전히 다름.
 
-**How to apply:** 내부 서비스 인터페이스는 구현 시 C# interface로 직접 매핑 가능. 외부 API는 HttpClient 래퍼 서비스로 구현.
+**How to apply:** 모든 API는 `/api/` 접두사로 Route Handler로 구현. 인증은 iron-session 쿠키 기반.
 
 ## 인증 패턴
 
-- Graph API: OAuth 2.0 Client Credentials Flow, 토큰 만료 5분 전 자동 갱신
-- Claude API: x-api-key 헤더, ANTHROPIC_API_KEY 환경변수
-- 인증 정보는 설정 조회 API에서 연결 상태(boolean)만 반환, 시크릿 노출 금지
+- iron-session 암호화 HTTP-only 쿠키 세션 (24시간 TTL)
+- 역할: admin / user (2가지)
+- 인증 불필요 엔드포인트: POST /api/auth/login, GET /api/health
+- admin 전용: User, Config, POST /api/mail/check
+- all: Auth(logout/me), Mail(status), Analysis, Dictionary
 
-## 코드 채번 체계
+## 주요 설계 결정
 
-그룹별 접두사 사용: GRAPH-, CLAUDE-, CFG-, MAIL-, ANAL-, DICT-
+- 버전 접두사 없음 (단일 서비스 내부 API)
+- 페이지네이션: page/limit 기반 (ANAL-002, DICT-001)
+- 민감정보: passwordConfigured/apiKeyConfigured boolean 반환 (AUTH-R-020)
+- CLAUDE-001: REST 엔드포인트가 아닌 서버 사이드 외부 호출 (@anthropic-ai/sdk)
+- api_graph.md 제거 (Microsoft Graph API 불필요)

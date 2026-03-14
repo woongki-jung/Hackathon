@@ -1,59 +1,115 @@
-# Sprint 1 배포 및 검증 가이드
+# Sprint 1 배포 및 검증 체크리스트
 
-## 자동 검증 완료
+> **스프린트**: Sprint 1 — 프로젝트 초기화 + DB 스키마 + 로그인 화면
+> **작성일**: 2026-03-15
+> **브랜치**: sprint1
+> **앱 위치**: `domain-dictionary/`
 
-- ✅ Core 프로젝트 빌드 (`dotnet build src/MailTermAnalyzer.Core/`) — 오류 없음
-- ✅ Infrastructure 프로젝트 빌드 (`dotnet build src/MailTermAnalyzer.Infrastructure/`) — 오류 없음
-- ✅ 단위 테스트 6개 통과 (`dotnet test tests/MailTermAnalyzer.Tests/`) — Passed: 6, Failed: 0
-- ❌ App 프로젝트 빌드 (`dotnet build src/MailTermAnalyzer.App/`) — Visual Studio C++ 빌드 도구 미설치로 실패 (수동 설치 필요)
+---
 
-## 수동 검증 필요
+## 자동 검증 결과 (sprint-close 시 실행)
 
-### 사전 준비: Visual Studio C++ 빌드 도구 설치
+| 항목 | 명령어 | 결과 |
+|------|--------|------|
+| 프로덕션 빌드 | `npm run build` | ✅ 성공 |
+| ESLint 검사 | `npm run lint` | ✅ 경고/오류 없음 |
+| DB 스키마 적용 | `npm run db:push` | ✅ 7개 테이블 생성 완료 |
 
-WinUI 3 앱 빌드는 MSVC (Microsoft C++ 빌드 도구)가 필요합니다.
-Visual Studio Installer를 열어 다음 워크로드를 추가로 설치하세요:
+### 자동 검증 상세
 
-1. Visual Studio Installer 실행 (`C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe`)
-2. Visual Studio 18 Professional의 "수정" 클릭
-3. 다음 워크로드 선택 후 설치:
-   - **C++를 사용한 데스크톱 개발** (Desktop development with C++)
-   - **Windows 앱 개발** (Windows application development) — Windows App SDK 포함
+#### npm run build
 
-### App 프로젝트 빌드 확인
+- ✅ 프로덕션 빌드 에러 없이 완료됨
+- 실행 위치: `domain-dictionary/`
 
-```bash
-dotnet build src/MailTermAnalyzer.App/MailTermAnalyzer.App.csproj -p:Platform=x64
+#### npm run lint
+
+- ✅ ESLint 경고/오류 없음
+- 실행 위치: `domain-dictionary/`
+
+#### npm run db:push
+
+- ✅ `data/app.db` 생성 확인
+- 생성된 테이블 (7개):
+  - `users` (DATA-001)
+  - `app_settings` (DATA-002)
+  - `mail_processing_logs` (DATA-003)
+  - `terms` (DATA-004)
+  - `term_source_files` (DATA-005)
+  - `stop_words` (DATA-006)
+  - `analysis_queue` (DATA-007)
+
+---
+
+## 수동 검증 필요 항목
+
+아래 항목은 로컬 개발 서버를 직접 실행한 상태에서 검증해야 합니다.
+
+### 사전 준비
+
+1. `domain-dictionary/.env.local` 파일 생성:
+
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<8자 이상, 영문+숫자+특수문자>
+DATABASE_PATH=./data/app.db
+SESSION_SECRET=<32자 이상 임의 문자열>
 ```
 
-예상 결과: `Build succeeded.`
+2. 개발 서버 실행:
 
-### 앱 실행 및 트레이 아이콘 검증
+```bash
+cd domain-dictionary
+npm run dev
+```
 
-1. 앱 실행:
-   ```bash
-   dotnet run --project src/MailTermAnalyzer.App/ -p:Platform=x64
-   ```
-   또는 `src/MailTermAnalyzer.App/bin/x64/Debug/net10.0-windows10.0.19041.0/` 의 .exe 실행
+---
 
-2. 트레이 아이콘 동작 확인:
-   - ⬜ 시스템 트레이(작업 표시줄 오른쪽 하단)에 앱 아이콘 표시됨
-   - ⬜ 아이콘 좌클릭 → 메인 윈도우 표시됨
-   - ⬜ 메인 윈도우 X 버튼 클릭 → 앱 종료 아닌 트레이 이동됨
-   - ⬜ 아이콘 우클릭 → 컨텍스트 메뉴 5개 항목 표시됨 (열기/환경설정/메일 즉시 확인/구분선/종료)
+### 검증 항목
 
-3. 환경설정 다이얼로그 검증:
-   - ⬜ 트레이 우클릭 → "환경설정" 클릭 → 다이얼로그 열림
-   - ⬜ 4개 설정 그룹 표시: 메일 계정 / 수신 설정 / 저장 경로 / 용어 분석
-   - ⬜ 수신 설정 > 폴링 주기를 120으로 변경 후 "저장" 클릭
-   - ⬜ 앱 재실행 → 환경설정 열기 → 폴링 주기 120 유지 확인
+#### 서버 기동 검증
 
-4. Client Secret 암호화 확인:
-   - ⬜ `appsettings.local.json` 파일 내 `EncryptedClientSecret` 필드가 Base64 암호화 값임을 확인 (평문 없음)
+- ⬜ `npm run dev` 실행 후 `http://localhost:3000` 접속 가능 확인
+- ⬜ 서버 콘솔에 에러 없이 "Ready" 메시지 출력 확인
+- ⬜ 루트(`/`) 접속 시 `/login` 으로 리다이렉트 확인 (또는 로그인 페이지 렌더링)
 
-## 알려진 이슈
+#### 초기 관리자 계정 자동 생성 검증
 
-| 이슈 | 원인 | 해결 방법 |
-|------|------|-----------|
-| App 빌드 실패 (MSVC not found) | Visual Studio C++ 빌드 도구 미설치 | 위 "사전 준비" 단계 수행 |
-| 트레이 아이콘 미표시 | H.NotifyIcon.WinUI 패키지 아이콘 파일 필요 | `src/MailTermAnalyzer.App/Assets/tray-icon.ico` 파일 필요 (Sprint 1 TODO) |
+- ⬜ 서버 첫 시작 후 `users` 테이블에 admin 계정 1건 생성됨 확인
+  - 확인 방법: `npx drizzle-kit studio` 또는 SQLite 뷰어 사용
+  - 예: `sqlite3 data/app.db "SELECT username, role FROM users;"`
+- ⬜ 서버 재시작 후 중복 생성 없음 확인
+
+#### 로그인 화면 UI 검증 (http://localhost:3000/login)
+
+- ⬜ 로그인 폼 정상 렌더링 확인 (아이디 입력, 비밀번호 입력, 로그인 버튼)
+- ⬜ 빈 입력 상태에서 로그인 버튼 클릭 시 유효성 오류 메시지 표시 확인
+- ⬜ 아이디 4자 미만 입력 시 오류 메시지 표시 확인 ("아이디는 4자 이상이어야 합니다" 또는 유사)
+- ⬜ 비밀번호 8자 미만 입력 시 오류 메시지 표시 확인
+- ⬜ Enter 키로 로그인 버튼 기능 작동 확인
+- ⬜ 브라우저 콘솔(F12) 에러 없음 확인
+
+#### 반응형 레이아웃 검증
+
+- ⬜ 모바일 뷰포트(360px) 레이아웃 정상 확인
+  - 개발자 도구 > 반응형 모드에서 360px 설정 후 확인
+  - 폼이 가로 전체 너비로 표시되고 요소가 잘리지 않음
+
+#### Playwright MCP 검증 시나리오 (선택, 앱 실행 중일 때 수행)
+
+> 아래 시나리오는 `http://localhost:3000` 이 실행 중인 상태에서 sprint-close 에이전트가 자동 수행하거나 직접 수행할 수 있습니다.
+
+1. `http://localhost:3000/login` 접속 후 폼 요소 존재 확인
+2. 로그인 버튼 클릭 (빈 입력) → 유효성 오류 메시지 확인
+3. 아이디 필드에 "ab" 입력 후 로그인 클릭 → 아이디 유효성 오류 확인
+4. 콘솔 에러 없음 확인
+5. 360px 뷰포트 → 모바일 레이아웃 정상 확인
+
+---
+
+## 비고
+
+- Next.js 버전: ROADMAP 명세는 v15이나 실제 설치 버전은 v16.1.6 (최신 stable)
+- `drizzle/` 디렉터리: 현재 마이그레이션 파일 미생성 (`db:push`로 직접 적용됨)
+- 로그인 API 연동은 Sprint 2에서 수행 예정 (현재 UI만 구현)
+- `.NET` 잔여 파일(src/, tests/, MailTermAnalyzer.slnx 등) 정리 완료

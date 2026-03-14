@@ -1,108 +1,117 @@
 # AnalysisQueue 데이터 정의
 
 ## 개요
-
-용어 해설 생성을 위한 분석 대기 및 재시도 큐를 관리하는 엔티티이다. 메일에서 추출된 용어 중 해설이 필요한 항목을 큐에 등록하고, Claude API 호출 결과에 따라 상태를 관리한다 (POL-TERM TERM-05, TERM-06).
+- 메일 수신 후 분석 대기 중인 파일의 상태를 관리하는 대기열이다.
+- 분석 완료 시 요약, 후속 작업 제안 등 분석 결과도 이 테이블에 저장한다.
+- 관련 도메인: 분석 (POL-TERM, POL-MAIL, POL-DATA)
 
 ---
 
-## DATA-006 AnalysisQueue
+## DATA-007 AnalysisQueue
 
 ### 엔티티 정보
-
 | 항목 | 내용 |
 |------|------|
 | 엔티티명 (논리) | AnalysisQueue |
 | 테이블명 (물리) | analysis_queue |
-| 설명 | 용어 해설 생성 대기/재시도 큐 |
-| 데이터베이스 | SQLite 3 |
+| 설명 | 메일 파일 분석 대기열 및 분석 결과 저장 |
+| 데이터베이스 | SQLite (better-sqlite3 + Drizzle ORM) |
 | 파티셔닝 | 없음 |
 
 ### 필드 정의
 
 | 필드명 | 컬럼명 | 타입 | 길이 | NOT NULL | 기본값 | 설명 | 개인정보 |
 |--------|--------|------|------|----------|--------|------|---------|
-| id | id | INTEGER | - | ✅ | AUTOINCREMENT | 기본 키 | |
-| termId | term_id | INTEGER | - | - | NULL | 용어 ID (FK -> terms.id, 등록 전에는 NULL) | |
-| termText | term_text | TEXT | 200 | ✅ | - | 용어 원문 | |
-| category | category | TEXT | 20 | ✅ | - | 분류 (EMR / Business / Abbreviation) | |
-| contextSnippet | context_snippet | TEXT | 500 | - | NULL | 용어 전후 문맥 (200자) | |
-| sourceFile | source_file | TEXT | 255 | ✅ | - | 출처 파일명 | |
-| status | status | TEXT | 20 | ✅ | 'PENDING' | 처리 상태 | |
-| retryCount | retry_count | INTEGER | - | ✅ | 0 | 재시도 횟수 | |
-| errorMessage | error_message | TEXT | - | - | NULL | 오류 메시지 (실패 시) | |
-| createdAt | created_at | TEXT | - | ✅ | datetime('now') | 생성일시 | |
-| updatedAt | updated_at | TEXT | - | ✅ | datetime('now') | 수정일시 | |
-
-### status 필드 값 정의
-
-| 값 | 설명 |
-|----|------|
-| PENDING | 대기 중 (아직 API 호출 전) |
-| PROCESSING | 처리 중 (API 호출 중) |
-| COMPLETED | 완료 (해설 생성 성공) |
-| FAILED | 실패 (최대 재시도 초과) |
-| SKIPPED | 건너뜀 (이미 사전에 해설 존재) |
+| id | id | TEXT | 36 | YES | - | 기본 키 (UUID) | |
+| fileName | file_name | TEXT | 255 | YES | - | 메일 임시 파일명 (`{timestamp}_{hash}.txt`, 유니크) | |
+| status | status | TEXT | 20 | YES | `'pending'` | 분석 상태 (`pending` / `processing` / `completed` / `failed`) | |
+| summary | summary | TEXT | - | NO | `NULL` | 메일 핵심 내용 요약 (최대 500자) | |
+| actionItems | action_items | TEXT | - | NO | `NULL` | 후속 작업 제안 목록 (JSON 배열 문자열, 최대 5개) | |
+| extractedTermCount | extracted_term_count | INTEGER | - | NO | `0` | 추출된 용어 수 | |
+| retryCount | retry_count | INTEGER | - | YES | `0` | 재시도 횟수 (최대 3회) | |
+| errorMessage | error_message | TEXT | 1000 | NO | `NULL` | 분석 실패 시 오류 메시지 | |
+| analyzedAt | analyzed_at | TEXT | - | NO | `NULL` | 분석 완료 일시 | |
+| mailSubject | mail_subject | TEXT | 500 | NO | `NULL` | 메일 제목 (분석 결과에서 추출) | |
+| mailReceivedAt | mail_received_at | TEXT | - | NO | `NULL` | 메일 수신 일시 (파일명에서 추출) | |
+| createdAt | created_at | TEXT | - | YES | `datetime('now')` | 대기열 등록 일시 | |
+| updatedAt | updated_at | TEXT | - | YES | `datetime('now')` | 최종 상태 변경 일시 | |
 
 ### 인덱스 정의
 
 | 인덱스명 | 대상 컬럼 | 타입 | 유니크 | 설명 |
 |----------|-----------|------|--------|------|
-| idx_analysis_queue_status | status | BTREE | - | 상태별 대기 항목 조회 |
-| idx_analysis_queue_created_at | created_at | BTREE | - | 생성순 정렬 (오래된 것 우선 처리) |
-| idx_analysis_queue_term_id | term_id | BTREE | - | 용어별 큐 조회 |
+| idx_aq_file_name | file_name | BTREE | YES | 파일명 중복 방지 및 조회 |
+| idx_aq_status | status | BTREE | NO | 상태별 필터 (pending 우선 조회) |
+| idx_aq_created_at | created_at | BTREE | NO | 등록순 정렬 |
+| idx_aq_analyzed_at | analyzed_at | BTREE | NO | 분석 완료순 정렬 (업무지원 페이지용) |
 
 ### 관계 정의
 
 | 관계 | 대상 엔티티 | 종류 | 외래 키 | 설명 |
 |------|------------|------|---------|------|
-| term | Term | N:1 | term_id -> terms.id | 연결된 용어 (해설 생성 후 연결) |
+| extractedTerms | Term | 1:N (논리적) | term_source_files.mail_file_name | 이 파일에서 추출된 용어 목록 (TermSourceFile 경유) |
+
+> `analysis_queue`와 `terms`는 직접 FK 관계가 아닌, `term_source_files.mail_file_name`을 통해 논리적으로 연결된다.
 
 ### DDL
 
 ```sql
-CREATE TABLE IF NOT EXISTS analysis_queue (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    term_id         INTEGER,
-    term_text       TEXT    NOT NULL,
-    category        TEXT    NOT NULL
-                            CHECK (category IN ('EMR', 'Business', 'Abbreviation')),
-    context_snippet TEXT,
-    source_file     TEXT    NOT NULL,
-    status          TEXT    NOT NULL DEFAULT 'PENDING'
-                            CHECK (status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'SKIPPED')),
-    retry_count     INTEGER NOT NULL DEFAULT 0,
-    error_message   TEXT,
-    created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (term_id) REFERENCES terms(id) ON DELETE SET NULL
+CREATE TABLE analysis_queue (
+    id TEXT PRIMARY KEY,
+    file_name TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    summary TEXT,
+    action_items TEXT,
+    extracted_term_count INTEGER DEFAULT 0,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    analyzed_at TEXT,
+    mail_subject TEXT,
+    mail_received_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_analysis_queue_status
-    ON analysis_queue(status);
+CREATE UNIQUE INDEX idx_aq_file_name ON analysis_queue(file_name);
+CREATE INDEX idx_aq_status ON analysis_queue(status);
+CREATE INDEX idx_aq_created_at ON analysis_queue(created_at);
+CREATE INDEX idx_aq_analyzed_at ON analysis_queue(analyzed_at);
+```
 
-CREATE INDEX IF NOT EXISTS idx_analysis_queue_created_at
-    ON analysis_queue(created_at);
+### Drizzle ORM 스키마 예시
 
-CREATE INDEX IF NOT EXISTS idx_analysis_queue_term_id
-    ON analysis_queue(term_id);
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+export const analysisQueue = sqliteTable('analysis_queue', {
+  id: text('id').primaryKey(),
+  fileName: text('file_name').notNull().unique(),
+  status: text('status', { enum: ['pending', 'processing', 'completed', 'failed'] }).notNull().default('pending'),
+  summary: text('summary'),
+  actionItems: text('action_items'), // JSON 배열 문자열
+  extractedTermCount: integer('extracted_term_count').default(0),
+  retryCount: integer('retry_count').notNull().default(0),
+  errorMessage: text('error_message'),
+  analyzedAt: text('analyzed_at'),
+  mailSubject: text('mail_subject'),
+  mailReceivedAt: text('mail_received_at'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
 ```
 
 ### 비즈니스 규칙
-
-- 메일 분석 시 추출된 용어 중 해설이 필요한 항목을 `PENDING` 상태로 큐에 등록한다.
-- 이미 사전에 해설이 완료된 용어는 `SKIPPED` 상태로 등록한다 (POL-TERM TERM-03: API 호출 비용 절감).
-- 배치 처리 시 `PENDING` 상태 항목을 `created_at` 오름차순으로 최대 20건 처리한다 (POL-TERM TERM-05).
-- API 호출 실패 시 (POL-TERM TERM-06):
-  - `retry_count`를 1 증가시키고 `error_message`에 오류 내용을 기록한다.
-  - `retry_count`가 3 미만이면 `PENDING` 상태로 유지하여 다음 배치에서 재시도한다.
-  - `retry_count`가 3 이상이면 `FAILED` 상태로 변경한다.
-- 처리 완료(`COMPLETED`) 및 실패(`FAILED`) 항목은 7일 후 물리 삭제할 수 있다 (정리 배치).
-- 일일 최대 API 호출 횟수(200건, app_settings의 `term_daily_api_max_calls`)를 초과하면 처리를 중단한다.
+- **상태 전이**: `pending` -> `processing` -> `completed` 또는 `failed`
+- **중복 등록 방지**: 이미 분석 완료/실패한 파일은 재등록하지 않는다 (POL-TERM TERM-R-003).
+- **재시도 정책**: 실패 시 다음 주기에 재시도, 최대 3회 (`retry_count` < 3이면 `pending`으로 복귀). 3회 연속 실패 시 `failed` 확정 (POL-TERM TERM-R-021).
+- **요약 생성**: 메일 핵심 내용 요약 최대 500자 (POL-TERM TERM-R-010).
+- **후속 작업**: 최대 5개 항목의 후속 작업 제안 생성, JSON 배열로 저장 (POL-TERM TERM-R-011).
+- **메일 원본 연결**: `file_name` 필드로 메일 임시 파일과 연결 (POL-TERM TERM-R-012).
+- **영구 보존**: 분석 결과(요약, 후속 작업)는 영구 보존 (POL-DATA DATA-R-018).
+- **업무지원 페이지**: 최신 분석 결과를 상단에 노출하고, 이전 이력은 목록으로 제공 (POL-UI UI-R-008, UI-R-016).
+- **본문 길이 제한**: API 호출 시 메일 본문 최대 10,000자 (POL-TERM TERM-R-009).
 
 ### 마이그레이션 고려사항
-
-- 앱 최초 실행 시 테이블을 자동 생성한다.
-- seed 데이터 불필요.
-- `context_snippet` 필드에는 개인정보가 포함될 수 있으므로, 처리 완료 후 일정 기간이 지나면 정리(삭제)하는 것을 권장한다.
-- SQLite에서 외래 키 제약을 활성화하려면 `PRAGMA foreign_keys = ON;`을 연결 시 실행해야 한다.
+- **초기 데이터**: 불필요 (메일 수신 시 자동 등록).
+- **actionItems 형식**: JSON 배열 문자열. 예: `["회의 일정 확인","담당자에게 회신","보고서 작성"]`
+- **status 확장 시**: CHECK 제약조건 변경이 필요하며, SQLite에서는 테이블 재생성이 필요할 수 있다.

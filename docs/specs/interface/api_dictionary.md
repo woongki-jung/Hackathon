@@ -1,381 +1,283 @@
-# 용어 사전 서비스 인터페이스 정의
+# Dictionary API 정의
 
 ## 개요
-
-- 본 문서는 앱 내부의 용어 사전 서비스 계층 인터페이스를 정의한다.
-- 용어 사전 서비스는 용어의 검색, 조회, 등록/갱신, 통계, 백업 기능을 제공한다.
-- 용어 사전은 로컬 파일 기반으로 저장한다 (JSON 또는 SQLite).
-- 관련 정책: POL-TERM (TERM-04), POL-DATA (DATA-04, DATA-05), POL-UI (UI-04~06)
+- 용어사전 검색, 빈도 트렌드 조회, 용어 상세 조회 API를 정의한다.
+- 프론트엔드 "용어사전 뷰어" 페이지에서 사용한다.
+- 관련 도메인 객체: Term (DATA-004), TermSourceFile (DATA-005)
+- 관련 기능: VIEW-SEARCH-001 (용어 검색), VIEW-TREND-001 (빈도 트렌드 조회), DATA-DICT-001 (용어 사전 저장소)
+- 관련 정책: POL-UI (UI-R-009, UI-R-012 ~ UI-R-014, UI-R-017), POL-TERM
 
 ---
 
-## DICT-001: 용어 검색
+## DICT-001 용어 검색
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 키워드로 용어 사전을 검색하여 일치하는 용어 목록을 반환한다 |
+| 메서드 | GET |
+| 경로 | /api/dictionary/search |
+| 인증 | 필요 |
+| 권한 | all (admin, user) |
+| 설명 | 키워드로 용어를 검색한다 (FTS5 전문 검색) |
 
-### 입력
+### 요청
 
+#### Query Parameters
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|------|--------|------|
-| keyword | string | ✅ | - | 검색 키워드 (2글자 이상) |
-| category | string | - | null | 카테고리 필터 (`EMR`, `Business`, `Abbreviation`). null이면 전체 |
-| page | integer | - | 1 | 페이지 번호 (1부터 시작) |
-| pageSize | integer | - | 20 | 페이지당 항목 수 (최대 100) |
+| q | string | ✅ | - | 검색 키워드 (1자 이상) |
+| category | string | ❌ | - | 분류 필터 (`emr` / `business` / `abbreviation` / `general`) |
+| page | number | ❌ | 1 | 페이지 번호 (1부터 시작) |
+| limit | number | ❌ | 20 | 페이지당 항목 수 (최대 100, UI-R-014) |
 
-### 출력
+#### 요청 예시
+```http
+GET /api/dictionary/search?q=EMR&category=emr&page=1&limit=20 HTTP/1.1
+Cookie: mail-term-session=...
+```
 
+### 응답
+
+#### 성공 응답 (200 OK)
 ```json
 {
-  "items": [
-    {
-      "id": "term_001",
-      "term": "OCS",
-      "category": "EMR",
-      "summary": "처방전달시스템(Order Communication System)",
-      "sourceCount": 12,
-      "lastSeenAt": "2026-03-13T14:30:22Z",
-      "matchType": "exact"
-    },
-    {
-      "id": "term_042",
-      "term": "OCS 연동",
-      "category": "EMR",
-      "summary": "OCS와 타 시스템 간 데이터 연동 프로세스",
-      "sourceCount": 3,
-      "lastSeenAt": "2026-03-12T09:15:00Z",
-      "matchType": "partial"
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "880e8400-e29b-41d4-a716-446655440020",
+        "name": "EMR",
+        "category": "emr",
+        "description": "Electronic Medical Record. 전자의무기록으로, 환자의 진료 정보를 전자적으로 기록하고 관리하는 시스템이다.",
+        "frequency": 15,
+        "updatedAt": "2026-03-15T10:01:30Z"
+      },
+      {
+        "id": "880e8400-e29b-41d4-a716-446655440021",
+        "name": "EMR 연동 API",
+        "category": "emr",
+        "description": "EMR 시스템과 외부 시스템 간 데이터를 주고받기 위한 Application Programming Interface이다.",
+        "frequency": 3,
+        "updatedAt": "2026-03-14T15:02:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 2,
+      "totalPages": 1
     }
-  ],
-  "totalCount": 2,
-  "page": 1,
-  "pageSize": 20,
-  "totalPages": 1
-}
-```
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| items | array | 검색 결과 목록 |
-| items[].id | string | 용어 고유 ID |
-| items[].term | string | 용어 원문 |
-| items[].category | string | 분류 (`EMR`, `Business`, `Abbreviation`) |
-| items[].summary | string | 1줄 요약 |
-| items[].sourceCount | integer | 발견 횟수 |
-| items[].lastSeenAt | string (ISO 8601) | 최근 발견 일시 |
-| items[].matchType | string | 매칭 유형 (`exact`, `partial`, `description`) |
-| totalCount | integer | 전체 검색 결과 수 |
-| page | integer | 현재 페이지 번호 |
-| pageSize | integer | 페이지당 항목 수 |
-| totalPages | integer | 전체 페이지 수 |
-
-### 검색 정렬 규칙 (UI-05)
-
-검색 결과는 관련도순으로 정렬한다:
-
-1. 용어 원문(`term`) 정확 일치 (`matchType: "exact"`)
-2. 용어 원문 부분 일치 (`matchType: "partial"`)
-3. 해설(`description`) 내 포함 (`matchType: "description"`)
-
-### 비즈니스 규칙
-
-- 검색 대상: 용어 원문(`term`) 및 해설(`description`) (UI-05).
-- 부분 일치 방식: 입력 문자열이 포함된 모든 항목을 반환한다 (UI-05).
-- 한글/영문 대소문자 구분 없이 검색한다 (UI-05).
-- 검색어 입력 시 300ms 디바운스를 적용하여 실시간 검색 결과를 표시한다 (UI-05, UI 측 구현).
-- 검색 결과가 없는 경우 빈 배열을 반환한다.
-
----
-
-## DICT-002: 용어 상세 조회
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 용어 ID로 상세 정보를 조회한다 |
-
-### 입력
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| id | string | ✅ | 용어 고유 ID |
-
-### 출력
-
-```json
-{
-  "id": "term_001",
-  "term": "OCS",
-  "category": "EMR",
-  "summary": "처방전달시스템(Order Communication System)",
-  "description": "OCS는 의사가 입력한 처방(약, 검사, 수술 등)을 약국, 검사실, 간호 부서 등으로 전자적으로 전달하는 병원 정보 시스템입니다. EMR의 핵심 구성 요소로, 처방 입력부터 실행까지의 프로세스를 자동화합니다.",
-  "relatedTerms": ["EMR", "CPOE", "처방전달"],
-  "sourceCount": 12,
-  "firstSeenAt": "2026-03-01T10:00:00Z",
-  "lastSeenAt": "2026-03-13T14:30:22Z",
-  "sourceFiles": [
-    "20260313_143022_a1b2c3d4.txt",
-    "20260312_091500_b2c3d4e5.txt"
-  ]
-}
-```
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| id | string | 용어 고유 ID |
-| term | string | 용어 원문 |
-| category | string | 분류 (`EMR`, `Business`, `Abbreviation`) |
-| summary | string | 1줄 요약 (50자 이내) |
-| description | string | 상세 설명 (200자 이내) |
-| relatedTerms | array of string | 관련 용어 목록 |
-| sourceCount | integer | 발견 횟수 |
-| firstSeenAt | string (ISO 8601) | 최초 발견 일시 |
-| lastSeenAt | string (ISO 8601) | 최근 발견 일시 |
-| sourceFiles | array of string | 출처 파일 목록 (최대 10건) |
-
-### 에러
-
-| 에러 코드 | 설명 |
-|-----------|------|
-| NOT_FOUND | 해당 ID의 용어가 존재하지 않음 |
-
-### 비즈니스 규칙
-
-- 상세 정보 표시 항목은 UI-06의 정의를 따른다.
-- `relatedTerms`에 포함된 용어를 클릭하면 해당 용어의 상세 정보로 이동할 수 있어야 한다 (UI-06).
-- 카테고리별 색상 구분은 UI 측에서 처리한다 (UI-06).
-
----
-
-## DICT-003: 용어 등록/갱신
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 신규 용어를 등록하거나 기존 용어의 메타데이터를 갱신한다 |
-
-### 입력: 신규 등록
-
-```json
-{
-  "term": "OCS",
-  "category": "EMR",
-  "summary": "처방전달시스템(Order Communication System)",
-  "description": "OCS는 의사가 입력한 처방을 약국, 검사실, 간호 부서 등으로 전자적으로 전달하는 병원 정보 시스템입니다.",
-  "relatedTerms": ["EMR", "CPOE"],
-  "sourceFile": "20260313_143022_a1b2c3d4.txt"
-}
-```
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| term | string | ✅ | 용어 원문 |
-| category | string | ✅ | 분류 (`EMR`, `Business`, `Abbreviation`) |
-| summary | string | - | 1줄 요약 (해설 미완료 시 빈 문자열) |
-| description | string | - | 상세 설명 (해설 미완료 시 빈 문자열) |
-| relatedTerms | array of string | - | 관련 용어 목록 |
-| sourceFile | string | ✅ | 출처 파일명 |
-
-### 출력
-
-```json
-{
-  "action": "created",
-  "id": "term_001",
-  "term": "OCS"
-}
-```
-
-또는 기존 용어 갱신 시:
-
-```json
-{
-  "action": "updated",
-  "id": "term_001",
-  "term": "OCS",
-  "sourceCount": 13
-}
-```
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| action | string | 수행된 작업 (`created` 또는 `updated`) |
-| id | string | 용어 고유 ID |
-| term | string | 용어 원문 |
-| sourceCount | integer | 갱신 후 발견 횟수 (updated 시에만) |
-
-### 비즈니스 규칙 (TERM-04)
-
-- 이미 사전에 존재하는 용어가 재발견된 경우:
-  - `sourceCount`를 1 증가시킨다.
-  - `lastSeenAt`을 현재 시각으로 갱신한다.
-  - `sourceFiles`에 출처 파일을 추가한다 (최대 10건 유지, 초과 시 가장 오래된 것 제거).
-  - 해설 내용(`summary`, `description`, `relatedTerms`)은 변경하지 않는다.
-- 동일 용어가 다른 카테고리로 분류될 가능성이 있는 경우, 기존 카테고리를 유지한다 (TERM-04).
-- 신규 등록 시 `sourceCount`는 1, `firstSeenAt`과 `lastSeenAt`은 현재 시각으로 설정한다.
-
----
-
-## DICT-004: 인기 용어 조회
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 최근 빈도가 높은 용어 목록을 조회한다 (메인 화면 바로가기용) |
-
-### 입력
-
-| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
-|----------|------|------|--------|------|
-| days | integer | - | 7 | 조회 기간 (최근 N일) |
-| limit | integer | - | 10 | 반환할 최대 항목 수 |
-
-### 출력
-
-```json
-{
-  "items": [
-    {
-      "id": "term_001",
-      "term": "OCS",
-      "category": "EMR",
-      "summary": "처방전달시스템(Order Communication System)",
-      "recentCount": 8
-    },
-    {
-      "id": "term_015",
-      "term": "DRG",
-      "category": "Business",
-      "summary": "진단관련그룹(Diagnosis Related Group)",
-      "recentCount": 5
-    }
-  ],
-  "period": {
-    "from": "2026-03-06T00:00:00Z",
-    "to": "2026-03-13T23:59:59Z"
   }
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| items | array | 인기 용어 목록 |
-| items[].id | string | 용어 고유 ID |
-| items[].term | string | 용어 원문 |
-| items[].category | string | 분류 |
-| items[].summary | string | 1줄 요약 |
-| items[].recentCount | integer | 조회 기간 내 발견 횟수 증가량 |
-| period.from | string (ISO 8601) | 조회 기간 시작 |
-| period.to | string (ISO 8601) | 조회 기간 종료 |
+| items[].id | string | 용어 UUID |
+| items[].name | string | 용어명 |
+| items[].category | string / null | 분류 (`emr` / `business` / `abbreviation` / `general`) |
+| items[].description | string | 용어 해설 (검색 결과 목록에서는 200자까지 잘라서 표시 가능) |
+| items[].frequency | number | 발견 빈도 |
+| items[].updatedAt | string | 마지막 갱신 일시 (ISO 8601) |
+| pagination | object | 페이지네이션 정보 |
 
-### 비즈니스 규칙
-
-- 최근 7일간 `sourceCount` 증가량 기준 상위 10개 용어를 반환한다 (UI-04).
-- 바로가기(태그/칩) 형태로 메인 화면에 표시된다 (UI-04).
-- 해설 미완료 상태의 용어도 목록에 포함될 수 있다.
-
----
-
-## DICT-005: 사전 통계 조회
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 용어 사전의 전체 통계 및 앱 상태 정보를 반환한다 |
-
-### 입력
-
-없음
-
-### 출력
-
-```json
-{
-  "totalTerms": 1250,
-  "categoryCounts": {
-    "EMR": 520,
-    "Business": 480,
-    "Abbreviation": 250
-  },
-  "pendingTerms": 5,
-  "lastMailCheckAt": "2026-03-13T14:30:00Z",
-  "lastAnalysisAt": "2026-03-13T14:31:00Z",
-  "todayApiCallsUsed": 45,
-  "dailyApiCallLimit": 200
-}
-```
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| totalTerms | integer | 총 등록 용어 수 |
-| categoryCounts | object | 카테고리별 용어 수 |
-| pendingTerms | integer | 해설 미완료 용어 수 |
-| lastMailCheckAt | string (ISO 8601, nullable) | 마지막 메일 확인 시각 |
-| lastAnalysisAt | string (ISO 8601, nullable) | 마지막 분석 완료 시각 |
-| todayApiCallsUsed | integer | 오늘 사용된 API 호출 수 |
-| dailyApiCallLimit | integer | 일일 API 호출 한도 |
-
-### 비즈니스 규칙
-
-- 메인 화면 하단 상태바에 "총 {n}개 용어 등록됨 | 마지막 메일 확인: {시각}" 형태로 표시한다 (UI-04).
-- 10,000건 초과 시 성능 모니터링을 권장한다 (POL-TERM 제약사항).
-
----
-
-## DICT-006: 사전 백업
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 트리거 | 앱 종료 시 자동 호출 |
-| 설명 | 용어 사전 데이터의 백업 파일을 생성한다 |
-
-### 입력
-
-없음
-
-### 출력
-
+#### 성공 응답 (200 OK) - 검색 결과 없음
 ```json
 {
   "success": true,
-  "backupPath": "Dictionary/backup/dictionary_20260313_150000.bak",
-  "backupSize": 524288,
-  "oldBackupsRemoved": 1
+  "data": {
+    "items": [],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 0,
+      "totalPages": 0
+    }
+  }
+}
+```
+
+> 검색 결과가 없으면 빈 배열을 반환한다. 프론트엔드에서 "검색 결과가 없습니다" 메시지를 표시한다 (UI-R-013).
+
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 |
+|-----------|-----------|------|
+| 400 | INVALID_REQUEST | 검색어(q) 누락 또는 빈 문자열 |
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 |
+
+### 비즈니스 규칙
+- SQLite FTS5를 활용하여 `name`과 `description` 필드에서 전문 검색한다.
+- 프론트엔드에서 300ms 디바운스를 적용하여 호출한다 (UI-R-012).
+- 한 페이지당 최대 20건 표시가 기본이며, 최대 100건까지 지원한다 (UI-R-014).
+- `category` 필터를 지정하면 해당 분류의 용어만 반환한다.
+- 정렬 기준: FTS5 관련도(rank) 우선, 동일 관련도이면 빈도 내림차순.
+
+### 관련 기능
+- VIEW-SEARCH-001 (용어 검색)
+- DATA-DICT-001 (용어 사전 저장소 - FTS5 조회)
+
+---
+
+## DICT-002 빈도 트렌드 조회
+
+### 기본 정보
+| 항목 | 내용 |
+|------|------|
+| 메서드 | GET |
+| 경로 | /api/dictionary/trending |
+| 인증 | 필요 |
+| 권한 | all (admin, user) |
+| 설명 | 발견 빈도가 높은 용어 상위 목록을 조회한다 |
+
+### 요청
+
+#### Query Parameters
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| limit | number | ❌ | 10 | 조회할 상위 용어 수 (최대 30) |
+
+#### 요청 예시
+```http
+GET /api/dictionary/trending?limit=10 HTTP/1.1
+Cookie: mail-term-session=...
+```
+
+### 응답
+
+#### 성공 응답 (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "880e8400-e29b-41d4-a716-446655440020",
+        "name": "EMR",
+        "category": "emr",
+        "frequency": 15,
+        "updatedAt": "2026-03-15T10:01:30Z"
+      },
+      {
+        "id": "880e8400-e29b-41d4-a716-446655440022",
+        "name": "OCS",
+        "category": "emr",
+        "frequency": 12,
+        "updatedAt": "2026-03-14T09:00:00Z"
+      },
+      {
+        "id": "880e8400-e29b-41d4-a716-446655440023",
+        "name": "SLA",
+        "category": "business",
+        "frequency": 8,
+        "updatedAt": "2026-03-13T16:30:00Z"
+      }
+    ]
+  }
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| success | boolean | 백업 성공 여부 |
-| backupPath | string | 생성된 백업 파일 경로 |
-| backupSize | integer | 백업 파일 크기 (바이트) |
-| oldBackupsRemoved | integer | 삭제된 오래된 백업 파일 수 |
+| items[].id | string | 용어 UUID |
+| items[].name | string | 용어명 |
+| items[].category | string / null | 분류 |
+| items[].frequency | number | 발견 빈도 |
+| items[].updatedAt | string | 마지막 갱신 일시 (ISO 8601) |
 
-### 에러
+> 페이지네이션 없이 `limit` 개수만큼 반환한다.
 
-| 에러 코드 | 설명 |
-|-----------|------|
-| WRITE_FAILED | 백업 파일 쓰기 실패 |
-| DISK_FULL | 디스크 용량 부족 |
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 |
+|-----------|-----------|------|
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 |
 
-### 비즈니스 규칙 (DATA-05)
+### 비즈니스 규칙
+- `terms` 테이블에서 `frequency` 내림차순으로 상위 N개를 조회한다 (UI-R-017).
+- 기본 10개, 최대 30개까지 요청 가능하다.
+- 용어사전 뷰어의 "빈도 높은 용어" 바로가기 영역에 사용된다 (UI-R-009).
 
-- 앱 종료 시 자동으로 백업 파일을 생성한다.
-- 백업 파일 경로: `Dictionary/backup/dictionary_{yyyyMMdd_HHmmss}.bak`
-- 백업 파일은 최근 7개만 유지하며, 초과 시 가장 오래된 파일을 삭제한다.
-- 백업 실패 시 에러 로그를 기록하되, 앱 종료를 차단하지 않는다.
+### 관련 기능
+- VIEW-TREND-001 (빈도 트렌드 조회)
+
+---
+
+## DICT-003 용어 상세 조회
+
+### 기본 정보
+| 항목 | 내용 |
+|------|------|
+| 메서드 | GET |
+| 경로 | /api/dictionary/terms/:id |
+| 인증 | 필요 |
+| 권한 | all (admin, user) |
+| 설명 | 특정 용어의 상세 정보 및 출처 메일 목록을 조회한다 |
+
+### 요청
+
+#### Path Parameters
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| id | string | ✅ | 용어 UUID |
+
+#### 요청 예시
+```http
+GET /api/dictionary/terms/880e8400-e29b-41d4-a716-446655440020 HTTP/1.1
+Cookie: mail-term-session=...
+```
+
+### 응답
+
+#### 성공 응답 (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "id": "880e8400-e29b-41d4-a716-446655440020",
+    "name": "EMR",
+    "category": "emr",
+    "description": "Electronic Medical Record. 전자의무기록으로, 환자의 진료 정보를 전자적으로 기록하고 관리하는 시스템이다. 진료기록, 처방 정보, 검사 결과 등을 통합 관리하며, 의료진 간 정보 공유와 진료 효율성 향상을 목적으로 한다.",
+    "frequency": 15,
+    "createdAt": "2026-03-01T10:00:00Z",
+    "updatedAt": "2026-03-15T10:01:30Z",
+    "sources": [
+      {
+        "mailSubject": "[긴급] EMR 시스템 업데이트 안내",
+        "mailReceivedAt": "2026-03-15T08:30:00Z"
+      },
+      {
+        "mailSubject": "EMR 연동 인터페이스 변경 공지",
+        "mailReceivedAt": "2026-03-10T09:15:00Z"
+      }
+    ]
+  }
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | string | 용어 UUID |
+| name | string | 용어명 |
+| category | string / null | 분류 (`emr` / `business` / `abbreviation` / `general`) |
+| description | string | 용어 해설 (전문) |
+| frequency | number | 발견 빈도 |
+| createdAt | string | 최초 추출 일시 (ISO 8601) |
+| updatedAt | string | 마지막 갱신 일시 (ISO 8601) |
+| sources | array | 이 용어가 추출된 출처 메일 목록 (최신순, 최대 10건) |
+| sources[].mailSubject | string / null | 출처 메일 제목 |
+| sources[].mailReceivedAt | string / null | 출처 메일 수신 일시 |
+
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 |
+|-----------|-----------|------|
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 |
+| 404 | NOT_FOUND | 해당 용어가 존재하지 않음 |
+
+### 비즈니스 규칙
+- `terms` 테이블과 `term_source_files` 테이블을 조인하여 조회한다.
+- 출처 메일 목록(`sources`)은 `mail_received_at` 기준 최신순으로 정렬하며 최대 10건만 반환한다.
+- 용어 데이터는 영구 보존되므로 삭제된 용어는 없다 (POL-DATA DATA-R-017).
+- `description` 필드는 전문을 반환한다 (DICT-001 검색 결과와 달리 잘라내지 않음).
+
+### 관련 기능
+- DATA-DICT-001 (용어 사전 저장소)
+- VIEW-SEARCH-001 (검색 결과에서 상세 조회 이동)

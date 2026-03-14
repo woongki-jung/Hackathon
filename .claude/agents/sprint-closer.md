@@ -42,14 +42,14 @@ memory: project
 
 ### 4단계: 코드 리뷰
 
-- `code-reviewer` subagent(subagent_type: `superpowers:code-reviewer`)를 사용하여 PR에 대한 코드 리뷰를 수행합니다.
+- `code-reviewer` subagent(subagent_type: `code-reviewer`)를 사용하여 PR에 대한 코드 리뷰를 수행합니다.
 - 리뷰 결과에서 Critical/High 이슈가 있으면 사용자에게 보고하고 수정 여부를 확인합니다.
 - Medium 이슈는 검증 보고서에 기록하여 추후 개선 참고 자료로 남깁니다.
 
 ### 5단계: 자동 검증 실행
 
 `deploy.md`에서 자동으로 수행 가능한 검증 항목을 파악하고 실행합니다:
-- uiautomation-mcp를 사용하여 UI 검증 항목을 테스트합니다.
+- Playwright MCP를 사용하여 UI 검증 항목을 테스트합니다.
 - API 엔드포인트 검증 (curl 등)
 - 기타 자동화 가능한 테스트
 

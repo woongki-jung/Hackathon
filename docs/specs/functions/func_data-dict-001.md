@@ -1,111 +1,135 @@
-# 용어 사전 저장소 관리 기능 정의
+# 용어 사전 저장소 기능 정의
 
 ## 개요
-
-- **기능 목적**: 용어 사전의 CRUD(생성/조회/수정) 및 중복 처리, 발견 횟수 갱신 등 데이터 관리를 수행한다.
-- **적용 범위**: 용어 분석(TERM-BATCH-001), 뷰어 검색(VIEW-SEARCH-001), 트렌드 조회(VIEW-TREND-001) 등 사전 데이터를 다루는 모든 기능.
+- 용어-해설 쌍을 DB와 마크다운 파일에 이중 저장하고, 갱신 조건을 판단하며, FTS5 검색 인덱스를 동기화하는 기능을 정의한다.
+- 적용 범위: 용어 분석 결과 저장, 용어사전 뷰어 데이터 제공
 
 ---
 
-## DATA-DICT-001: 용어 사전 저장소 관리
+## DATA-DICT-001 용어 사전 저장소
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 기능명 | 용어 사전 저장소 관리 |
+| 기능명 | 용어 사전 저장소 |
 | 분류 | 도메인 특화 로직 |
-| 레이어 | Infrastructure (저장소) + Domain (중복 처리 규칙) |
-| 트리거 | 용어 등록/조회/수정 요청 시 |
-| 관련 정책 | POL-DATA (DATA-04), POL-TERM (TERM-04) |
+| 레이어 | lib/dictionary |
+| 트리거 | TERM-GEN-001에서 해설 생성 완료 후 |
+| 관련 정책 | POL-DATA (DATA-R-006, DATA-R-011 ~ DATA-R-014), POL-TERM (TERM-R-016 ~ TERM-R-019) |
 
 ### 입력 / 출력
 
-#### 용어 등록/갱신 (Upsert)
+#### 1. 용어 저장/갱신 (saveTerm)
 
-**입력**
-
+##### 입력 (Input)
 | 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
 |----------|------|------|------|-------------|
-| term | string | ✅ | 용어 원문 | 2자 이상 |
-| category | enum | ✅ | 분류 (EMR / Business / Abbreviation) | |
-| description | string | 신규 시 ✅ | 해설 텍스트 | |
-| sourceFile | string | ✅ | 출처 파일명 | |
+| name | string | ✅ | 용어명 | 최대 200자 |
+| category | string | ✅ | 분류 | "emr" / "business" / "abbreviation" / "general" |
+| description | string | ✅ | 해설 | - |
+| sourceMailSubject | string | ❌ | 출처 메일 제목 | - |
+| sourceMailDate | string | ❌ | 출처 메일 수신일 | ISO 8601 |
+| sourceMailFileName | string | ❌ | 출처 메일 파일명 | - |
 
-**출력**
-
+##### 출력 (Output)
 | 항목 | 타입 | 설명 |
 |------|------|------|
-| isNew | boolean | 신규 등록 여부 |
-| entry | DictionaryEntry | 등록/갱신된 항목 |
+| termId | string | 용어 레코드 ID |
+| action | "created" / "updated" / "skipped" | 수행된 동작 |
 
-#### 용어 조회 (Get)
+#### 2. 용어 조회 (getTerm / getTermByName)
 
-**입력**
+##### 입력 (Input)
+| 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
+|----------|------|------|------|-------------|
+| id | string | ✅ (ID 조회) | 용어 UUID | - |
+| name | string | ✅ (이름 조회) | 용어명 | - |
 
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| term | string | ✅ | 용어 원문 |
-
-**출력**: DictionaryEntry 또는 null
-
-#### DictionaryEntry 구조
-
-| 필드 | 타입 | 설명 |
+##### 출력 (Output)
+| 항목 | 타입 | 설명 |
 |------|------|------|
-| term | string | 용어 원문 |
-| category | enum | 분류 (EMR / Business / Abbreviation) |
-| description | string | 해설 텍스트 |
-| sourceCount | int | 발견 횟수 |
-| firstSeenAt | DateTime | 최초 발견 일시 |
-| lastSeenAt | DateTime | 최근 발견 일시 |
-| sourceFiles | string[] | 출처 파일 목록 (최대 10건) |
+| term | Term | null | 용어 정보 (DATA-004 필드 전체) |
 
-#### 예외 / 오류
-
+##### 예외 / 오류
 | 조건 | 오류 코드 | 설명 |
 |------|-----------|------|
-| 저장소 접근 실패 | ERR_DICT_STORE_FAILED | JSON/SQLite 파일 읽기/쓰기 실패 |
-| 데이터 손상 | ERR_DICT_CORRUPTED | 데이터 파일 파싱 불가 |
+| 파일 생성 실패 | ERR_DICT_FILE_WRITE | 해설집 파일 쓰기 실패 (DB는 성공했으나 파일 실패) |
 
 ### 처리 흐름
 
-**Upsert 흐름**:
+#### 용어 저장/갱신 흐름
 
-1. **기존 항목 조회**: 동일 term이 사전에 존재하는지 확인한다.
-2. **신규 등록** (미존재 시):
-   - 모든 필드를 설정하여 새 항목을 생성한다.
-   - sourceCount=1, firstSeenAt=현재 시각, lastSeenAt=현재 시각.
-3. **기존 항목 갱신** (존재 시, TERM-04):
-   - `sourceCount`를 1 증가한다.
-   - `lastSeenAt`을 현재 시각으로 갱신한다.
-   - `sourceFiles`에 출처 파일을 추가한다 (최대 10건, 초과 시 가장 오래된 것 제거).
-   - **해설 내용(description)은 변경하지 않는다** (TERM-04).
-   - **카테고리(category)는 변경하지 않는다** (TERM-04).
-4. **저장**: 변경 사항을 저장소에 기록한다.
-5. **결과 반환**: isNew 여부와 항목을 반환한다.
+```mermaid
+flowchart TD
+    A[용어 저장 요청] --> B[DB에서 동일 용어명 조회]
+    B --> C{기존 용어 존재?}
+    C -- 아니오 --> D[신규 생성]
+    D --> D1[DB INSERT]
+    D1 --> D2[해설집 .md 파일 생성]
+    D2 --> D3[TermSourceFile 추가]
+    D3 --> E[결과 반환 action=created]
+    C -- 예 --> F{갱신 조건 충족?}
+    F -- 아니오 --> G[frequency 증가 + 출처 추가만]
+    G --> G1[TermSourceFile 추가]
+    G1 --> H[결과 반환 action=skipped]
+    F -- 예 --> I[DB UPDATE + 파일 갱신]
+    I --> I1[frequency 증가]
+    I1 --> I2[해설집 .md 파일 덮어쓰기]
+    I2 --> I3[TermSourceFile 추가]
+    I3 --> J[결과 반환 action=updated]
+```
+
+### 갱신 조건 판단 (TERM-R-018)
+
+기존 해설이 있는 경우, 다음 조건 중 하나 이상 충족 시 갱신:
+1. 새 해설의 문자 수가 기존 대비 20% 이상 증가
+2. 새 출처 메일 정보가 추가된 경우 (sourceMailFileName이 기존과 다른 경우)
+
+### 해설집 파일 형식 (TERM-R-017, TERM-R-019)
+
+```markdown
+# {용어명}
+
+## 해설
+{용어 해설 내용}
+
+## 분류
+{emr / business / abbreviation / general}
+
+## 메타정보
+- 마지막 갱신: {YYYY-MM-DD HH:mm}
+- 출처: {마지막 출처 메일 제목} ({수신일})
+- 발견 빈도: {frequency}회
+```
+
+### 파일명 규칙
+- `{용어명}.md` (GLOSSARY_STORAGE_PATH 하위)
+- 파일명 불가 문자 치환: CMN-FS-001.sanitizeFileName 사용 (DATA-R-012)
 
 ### 구현 가이드
 
-- **패턴**: Repository 패턴. `IDictionaryRepository` 인터페이스를 정의하여 JSON/SQLite 구현을 교체 가능하게 설계.
-- **성능**: 10,000건 초과 시 성능 모니터링 권장 (POL-TERM 제약사항). SQLite 사용 시 인덱스 설계 고려.
-- **동시성**: 읽기/쓰기 동시 접근 시 파일 잠금 또는 SQLite WAL 모드 활용.
-- **외부 의존성**: JSON 직렬화 또는 SQLite 라이브러리
+- **패턴**: Repository 패턴 - lib/dictionary/term-repository.ts
+- **이중 저장**: DB INSERT/UPDATE + 파일 생성/덮어쓰기를 하나의 트랜잭션으로 처리
+- **FTS5 동기화**: DB 트리거로 자동 동기화 (DDL에 정의됨)
+- **동시성**: DB UNIQUE 제약으로 중복 방지, 파일 쓰기는 last-write-wins
+- **외부 의존성**: Drizzle ORM, CMN-FS-001
 
 ### 관련 기능
+- **이 기능을 호출하는 기능**: TERM-BATCH-001, VIEW-SEARCH-001, VIEW-TREND-001
+- **이 기능이 호출하는 기능**: CMN-FS-001, CMN-LOG-001
 
-- **이 기능을 호출하는 기능**: TERM-BATCH-001, VIEW-SEARCH-001, VIEW-TREND-001, VIEW-STATE-001
-- **이 기능이 호출하는 기능**: CMN-FS-001 (디렉터리 보장), CMN-LOG-001
+### 관련 데이터
+- DATA-004 Term (terms 테이블)
+- DATA-005 TermSourceFile (term_source_files 테이블)
+- 파일 시스템: GLOSSARY_STORAGE_PATH (`./data/terms`)
 
 ### 테스트 시나리오
 
 | 시나리오 | 입력 조건 | 기대 결과 |
 |----------|-----------|-----------|
-| 신규 등록 | 미등록 용어 "PACS" | isNew=true, sourceCount=1 |
-| 중복 갱신 | 기존 용어 "PACS" 재발견 | isNew=false, sourceCount 증가 |
-| 해설 미변경 | 기존 용어 재발견, 다른 description 전달 | 기존 해설 유지 |
-| 카테고리 미변경 | 기존 EMR 용어, Business로 재분류 시도 | EMR 유지 |
-| sourceFiles 최대 10건 | 11번째 sourceFile 추가 | 가장 오래된 1건 제거, 10건 유지 |
-| 용어 조회 | 등록된 용어 | DictionaryEntry 반환 |
-| 미등록 용어 조회 | 미등록 용어 | null 반환 |
-| 데이터 손상 | JSON 파싱 불가 | ERR_DICT_CORRUPTED |
+| 신규 용어 저장 | 존재하지 않는 용어명 | DB INSERT + .md 파일 생성, action=created |
+| 기존 용어 갱신 (해설 증가) | 기존 100자, 새 150자 (50% 증가) | DB UPDATE + 파일 덮어쓰기, action=updated |
+| 기존 용어 스킵 | 기존 100자, 새 110자 (10% 증가, 동일 출처) | frequency만 증가, action=skipped |
+| 파일명 특수문자 | 용어명="EMR:관리/시스템" | 파일명="EMR_관리_시스템.md" |
+| 출처 추가 | 동일 용어, 다른 메일 파일 | TermSourceFile 추가, frequency 증가 |
+| 영구 보존 확인 | 삭제 요청 | 삭제 기능 미제공 (DATA-R-014) |

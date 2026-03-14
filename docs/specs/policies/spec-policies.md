@@ -1,37 +1,51 @@
-# 정책 정의 총괄 문서
+# 서비스 정책 정의 목록
 
 ## 개요
 
-본 문서는 `docs/PRD.md`에 정의된 메일 수신 용어 해설 업무 지원 도구의 서비스 정책을 정의합니다.
-각 정책은 개별 문서로 상세 내용을 관리하며, 본 문서는 정책 목록과 상호 관계를 총괄합니다.
+### 정책 설계 원칙
+- 메일 수신 용어 해설 업무 지원 웹 서비스의 운영에 필요한 규칙 체계를 정의한다.
+- 모든 정책은 Next.js 15 (App Router) 기반 웹 서비스 환경을 전제로 한다.
+- 정책 규칙은 개발자가 코드로 즉시 변환할 수 있을 만큼 구체적으로 기술한다.
+
+### 정책 코드 체계
+- `POL-AUTH`: 인증/보안 정책
+- `POL-MAIL`: 메일 수신 정책
+- `POL-DATA`: 데이터 저장 정책
+- `POL-TERM`: 용어 분석 정책
+- `POL-UI`: UI/UX 정책
+
+### 우선순위 및 충돌 해결 원칙
+1. 보안 정책(POL-AUTH)이 다른 모든 정책보다 우선한다.
+2. 데이터 정책(POL-DATA)은 비즈니스 정책(POL-MAIL, POL-TERM)보다 우선한다.
+3. 정책 간 충돌 발생 시, 보안 > 데이터 무결성 > 사용자 편의 순서로 해결한다.
+
+## 진행 상태 범례
+- ✅ 정의 완료
+- 🔄 검토 중
+- 📋 정의 예정
+- ⏸️ 보류
 
 ## 정책 목록
 
-| 정책 코드 | 정책명 | 설명 | 문서 |
-|-----------|--------|------|------|
-| POL-AUTH | 인증 및 보안 정책 | 메일 계정 인증 정보 보호 및 API 인증 관련 정책 | [policy_pol-auth.md](policy_pol-auth.md) |
-| POL-MAIL | 메일 수신 정책 | 메일함 모니터링 주기, 수신 범위, 처리 규칙 | [policy_pol-mail.md](policy_pol-mail.md) |
-| POL-DATA | 데이터 저장 정책 | 메일 텍스트 저장 형식, 경로, 파일 명명 규칙 | [policy_pol-data.md](policy_pol-data.md) |
-| POL-TERM | 용어 분석 정책 | 용어 분류 기준, 해설 생성 규칙, 사전 관리 정책 | [policy_pol-term.md](policy_pol-term.md) |
-| POL-UI | UI/UX 정책 | 트레이 동작 규칙, 뷰어 표시 규칙, 검색 정책 | [policy_pol-ui.md](policy_pol-ui.md) |
+| 코드 | 정책명 | 분류 | 설명 | 상태 |
+|------|--------|------|------|------|
+| POL-AUTH | 인증/보안 정책 | 인증/인가, 보안 | 웹 로그인, 세션 관리, IMAP 인증 정보 보호, Claude API 키 관리 | ✅ |
+| POL-MAIL | 메일 수신 정책 | 비즈니스 규칙 | IMAP 프로토콜 기반 메일 수신, SSL/TLS 통신, 주기적 확인 규칙 | ✅ |
+| POL-DATA | 데이터 저장 정책 | 데이터 | SQLite DB 관리, 파일 시스템 저장, 보존/삭제 규칙 | ✅ |
+| POL-TERM | 용어 분석 정책 | 비즈니스 규칙 | Claude API 기반 용어 추출/해설 생성, 용어.md 파일 관리 | ✅ |
+| POL-UI | UI/UX 정책 | 운영 | 반응형 웹 지원, 브라우저 호환성, 접근성 기준 | ✅ |
 
-## 정책 간 의존 관계
+## 정책 분류 체계
 
-```
-POL-AUTH ──> POL-MAIL ──> POL-DATA ──> POL-TERM
-                                          │
-POL-UI <──────────────────────────────────┘
-```
+### 인증/인가 및 보안 정책
+- **POL-AUTH**: 관리자/일반 사용자 로그인, iron-session 쿠키 세션, bcrypt 비밀번호 해싱, IMAP 계정 정보 보호, Claude API 키 관리
 
-- **POL-AUTH**: 모든 외부 통신의 전제 조건 (메일 서버 접속, Claude API 호출)
-- **POL-MAIL**: POL-AUTH의 인증 정보를 사용하여 메일을 수신
-- **POL-DATA**: POL-MAIL에서 수신한 메일을 저장하는 규칙 정의
-- **POL-TERM**: POL-DATA에 저장된 파일을 분석하여 용어 사전 생성
-- **POL-UI**: POL-TERM의 용어 사전 데이터를 사용자에게 표시
+### 데이터 정책
+- **POL-DATA**: SQLite(better-sqlite3 + Drizzle ORM) 데이터 관리, `./data/` 경로 기반 파일 저장, 메일 임시 파일 보존/삭제, 용어 해설집 파일 관리
 
-## 기술 환경 전제
+### 비즈니스 규칙
+- **POL-MAIL**: IMAP 프로토콜(imapflow) 기반 메일 수신, SSL/TLS 필수, node-cron 기반 주기적 실행
+- **POL-TERM**: Claude API(@anthropic-ai/sdk) 기반 용어 분석, 메일 요약 및 후속 작업 제안, 용어 해설집 생성/갱신
 
-- 실행 환경: Windows 11 이상
-- 런타임: .NET 10
-- 메일 프로토콜: Microsoft Graph API (Microsoft 365 / Outlook)
-- AI 해설 생성: Claude Code API
+### 운영 정책
+- **POL-UI**: ES2016/CSS3 호환 브라우저 지원, Tailwind CSS 기반 반응형 디자인, 검색 UX 규칙

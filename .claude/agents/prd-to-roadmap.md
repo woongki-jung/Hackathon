@@ -61,8 +61,8 @@ memory: project
 - 기준 1
 - 기준 2
 
-### 🧪 uiautomation-mcp 검증 시나리오
-각 Phase 완료 시 `` 실행 후 uiautomation-mcp 도구로 아래 시나리오를 직접 검증합니다.
+### 🧪 Playwright MCP 검증 시나리오
+각 Phase 완료 시 `` 실행 후 Playwright MCP 도구로 아래 시나리오를 직접 검증합니다.
 
 ```
 # 검증 시나리오 예시 (각 Phase별 구체적 항목으로 작성)
@@ -131,11 +131,11 @@ ROADMAP.md 작성 완료 후 다음을 확인합니다:
 - ⬜ 현재 날짜 기준으로 일정이 현실적인가?
 - ⬜ 각 Phase에 Playwright MCP 검증 시나리오가 포함되었는가?
 
-## uiautomation-mcp 단계별 검증 가이드
+## Playwright MCP 단계별 검증 가이드
 
-각 Phase 완료 시 개발 프로그램을 실행한 상태에서 uiautomation-mcp 도구를 사용하여 기능을 직접 검증합니다.
+각 Phase 완료 시 개발 프로그램을 실행한 상태에서 Playwright MCP 도구를 사용하여 기능을 직접 검증합니다.
 
-### 사용 가능한 uiautomation-mcp 도구
+### 사용 가능한 Playwright MCP 도구
 
 | 도구                     | 용도                     |
 | ---------------------- | ---------------------- |

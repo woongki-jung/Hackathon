@@ -1,68 +1,70 @@
 # 용어 분류 기능 정의
 
 ## 개요
-
-- **기능 목적**: 추출된 용어를 EMR, Business, Abbreviation 카테고리로 분류한다.
-- **적용 범위**: 배치 분석(TERM-BATCH-001)에서 불용어 필터링 후 호출된다.
+- 추출된 용어를 emr/business/abbreviation/general 카테고리로 분류하는 기능을 정의한다.
+- 적용 범위: 용어 추출 결과의 분류 검증 및 보정
 
 ---
 
-## TERM-CLS-001: 용어 분류
+## TERM-CLS-001 용어 분류
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
 | 기능명 | 용어 분류 |
 | 분류 | 도메인 특화 로직 |
-| 레이어 | Domain |
-| 트리거 | TERM-BATCH-001에서 필터링된 용어에 대해 호출 |
-| 관련 정책 | POL-TERM (TERM-01) |
+| 레이어 | lib/analysis |
+| 트리거 | TERM-EXT-001 용어 추출 시 (Claude API 응답에 분류 포함) |
+| 관련 정책 | POL-TERM (TERM-R-013) |
 
 ### 입력 / 출력
 
-#### 입력 (Input)
+#### classifyTerm / validateCategory
 
+##### 입력 (Input)
 | 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
 |----------|------|------|------|-------------|
-| candidate | TermCandidate | ✅ | 분류 대상 용어 후보 | |
+| category | string | ✅ | Claude API가 반환한 분류값 | - |
 
-#### 출력 (Output)
-
+##### 출력 (Output)
 | 항목 | 타입 | 설명 |
 |------|------|------|
-| category | enum | EMR / Business / Abbreviation |
-| confidence | float | 분류 신뢰도 (0.0~1.0) |
+| validCategory | "emr" / "business" / "abbreviation" / "general" | 유효한 분류값 |
+
+### 분류 기준 (TERM-R-013)
+
+| 분류 | 설명 | 예시 |
+|------|------|------|
+| emr | EMR(전자의무기록) 시스템 관련 용어 | OCS, PACS, HL7, DICOM |
+| business | 비즈니스/업무 용어 | 매출, 결산, 발주, 납기 |
+| abbreviation | 약어/축약어 | ASAP, FYI, KPI, SLA |
+| general | 기타 일반 전문용어 | 스크럼, 리팩토링, 마이그레이션 |
 
 ### 처리 흐름
 
-1. **EMR 용어 사전 매칭**: 사전 정의된 EMR 용어 목록(OCS, PACS, CDR, HL7, FHIR 등)과 매칭한다 (TERM-01).
-   - 정확 매칭 시 EMR 카테고리, confidence=1.0
-2. **Business 용어 사전 매칭**: 의료/병원 업무 용어 목록(DRG, 수가, 원외처방 등)과 매칭한다 (TERM-01).
-   - 정확 매칭 시 Business 카테고리, confidence=1.0
-3. **패턴 기반 분류**: 사전에 없는 경우 패턴으로 추론한다.
-   - 2글자 이상 연속 대문자 -> Abbreviation (기본 분류, TERM-01)
-   - 영문+숫자 코드 패턴 -> EMR (의료 코드 체계 가능성)
-   - 한글 전문 용어 -> Business
-4. **결과 반환**: 카테고리와 신뢰도를 반환한다.
+1. **분류값 검증**: Claude API 응답의 category가 허용 값 목록에 포함되는지 확인
+2. **정규화**: 대소문자 통일, 공백 제거
+3. **폴백**: 유효하지 않은 분류값은 "general"로 대체
 
 ### 구현 가이드
 
-- **패턴**: Strategy 패턴으로 분류 규칙을 확장 가능하게 설계. 규칙 체인(Chain of Responsibility) 고려.
-- **확장성**: EMR/Business 용어 사전은 외부 파일에서 로드하여 유지보수 가능하게 설계.
-- **성능**: 사전을 HashSet/Dictionary로 메모리에 캐싱하여 빠른 조회 보장.
+- **패턴**: Pure Function - lib/analysis/term-classifier.ts
+- **Claude API 통합**: TERM-EXT-001의 프롬프트에서 분류를 함께 요청하므로, 이 기능은 응답 검증/정규화 역할
+- **확장성**: 분류 카테고리 추가 시 이 모듈만 수정
+- **외부 의존성**: 없음 (순수 유틸리티)
 
 ### 관련 기능
+- **이 기능을 호출하는 기능**: TERM-EXT-001
+- **이 기능이 호출하는 기능**: 없음
 
-- **이 기능을 호출하는 기능**: TERM-BATCH-001
-- **이 기능이 호출하는 기능**: 없음 (순수 함수)
+### 관련 데이터
+- DATA-004 Term (category 필드)
 
 ### 테스트 시나리오
 
 | 시나리오 | 입력 조건 | 기대 결과 |
 |----------|-----------|-----------|
-| EMR 용어 매칭 | "PACS" | category=EMR, confidence=1.0 |
-| Business 용어 매칭 | "DRG" | category=Business, confidence=1.0 |
-| 대문자 약어 기본 분류 | "ABC" (사전 미등록) | category=Abbreviation |
-| 코드 패턴 | "HL7v2" | category=EMR |
-| 한글 전문 용어 | "수가" | category=Business |
+| 유효한 분류 | category="emr" | "emr" 반환 |
+| 대소문자 정규화 | category="EMR" | "emr" 반환 |
+| 미지 분류 | category="medical" | "general" 폴백 |
+| 빈 값 | category="" | "general" 폴백 |

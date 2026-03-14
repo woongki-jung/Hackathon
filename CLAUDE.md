@@ -74,7 +74,7 @@ description: 스킬 설명
 | ------------------ | --------------------- | ------------- | --------------------------------------------------- |
 | `prd-to-policies`  | PRD -> 서비스 정책 변환      | `docs/PRD.md` | `docs/specs/policies/spec-policies.md` 및 하위 정책 문서   |
 | `prd-to-datas`     | PRD -> 데이터 정의 변환      | `docs/PRD.md` | `docs/specs/datas/spec-datas.md` 및 하위 정책 문서         |
-| `prd-to-apis`      | PRD -> 인터페이스 정의 변환    | `docs/PRD.md` | `docs/specs/apis/spec-apis.md` 및 하위 정책 문서           |
+| `prd-to-apis`      | PRD -> 인터페이스 정의 변환    | `docs/PRD.md` | `docs/specs/interface/spec-apis.md` 및 하위 API 문서       |
 | `prd-to-functions` | PRD -> 서비스 공통 기능정의 변환 | `docs/PRD.md` | `docs/specs/functions/spec-functions.md` 및 하위 정책 문서 |
 | `prd-to-screens`   | PRD -> 서비스 화면정의 변환    | `docs/PRD.md` | `docs/specs/screens/spec-screens.md` 및 하위 정책 문서     |
 | `prd-to-roadmap`   | PRD -> 로드맵 변환         | `docs/PRD.md` | `docs/ROADMAP.md`                                   |
@@ -82,9 +82,9 @@ description: 스킬 설명
 | `sprint-close`     | 스프린트 마무리              | 현재 브랜치        | PR, 검증 보고서                                          |
 | `code-reviewer`    | 코드 리뷰                 | 구현 완료 단계      | 이슈 분류 보고 (Critical/Important/Suggestion)            |
 
-## uiautomation-mcp 검증
+## Playwright MCP 검증
 
-`sprint-close` 및 `prd-to-roadmap` 에이전트는 uiautomation-mcp 도구를 사용하여 앱 실행 상태에서 UI를 직접 검증합니다. 검증 결과는 `docs/sprint/sprint{N}/test-report.md`에 저장합니다.
+`sprint-close` 및 `prd-to-roadmap` 에이전트는 Playwright MCP 도구를 사용하여 앱 실행 상태에서 UI를 직접 검증합니다. 검증 결과는 `docs/sprint/sprint{N}/test-report.md`에 저장합니다.
 
 ## 언어 및 커뮤니케이션 규칙
 

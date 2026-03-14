@@ -1,104 +1,88 @@
-# HTTP 재시도 처리 기능 정의
+# HTTP 재시도 기능 정의
 
 ## 개요
-
-- **기능 목적**: 외부 API 호출 시 일시적 실패에 대한 재시도 전략(지수 백오프, Rate Limit 대응)을 공통으로 제공한다.
-- **적용 범위**: Graph API 호출(CMN-AUTH-001, MAIL-RECV-001), Claude API 호출(TERM-GEN-001) 등 모든 HTTP 기반 외부 통신에 적용한다.
+- 외부 API/서비스 호출 시 일시적 오류에 대한 재시도 로직을 정의한다.
+- 적용 범위: Claude API 호출, IMAP 연결 등 외부 서비스 통신
 
 ---
 
-## CMN-HTTP-001: HTTP 재시도 처리
+## CMN-HTTP-001 HTTP 재시도
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 기능명 | HTTP 재시도 처리 |
+| 기능명 | HTTP 재시도 |
 | 분류 | 공통 기능 |
-| 레이어 | Infrastructure |
-| 트리거 | HTTP 요청 실패 시 |
-| 관련 정책 | POL-AUTH (AUTH-04), POL-MAIL (MAIL-06) |
+| 레이어 | lib/http |
+| 트리거 | 외부 서비스 호출 실패 시 |
+| 관련 정책 | POL-MAIL (MAIL-R-003), POL-TERM (TERM-R-007, TERM-R-008) |
 
 ### 입력 / 출력
 
-#### 입력 (Input)
+#### withRetry (범용 재시도 래퍼)
 
+##### 입력 (Input)
 | 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
 |----------|------|------|------|-------------|
-| request | HttpRequestMessage | ✅ | 실행할 HTTP 요청 | |
-| retryPolicy | RetryPolicy | ✅ | 재시도 정책 설정 | |
+| fn | () => Promise<T> | ✅ | 실행할 비동기 함수 | - |
+| options.maxRetries | number | ❌ | 최대 재시도 횟수 | 기본값 3 |
+| options.delayMs | number | ❌ | 재시도 간격 (ms) | 기본값 5000 |
+| options.timeoutMs | number | ❌ | 단일 호출 타임아웃 (ms) | 기본값 60000 |
+| options.shouldRetry | (error) => boolean | ❌ | 재시도 조건 판단 함수 | - |
+| options.onRetry | (attempt, error) => void | ❌ | 재시도 시 콜백 (로깅용) | - |
 
-**RetryPolicy 구조**
-
-| 필드 | 타입 | 설명 | 기본값 |
-|------|------|------|--------|
-| maxRetries | int | 최대 재시도 횟수 | 3 |
-| backoffType | enum | Fixed / Exponential | Exponential |
-| baseDelayMs | int | 기본 대기 시간(ms) | 1000 |
-| retryableStatusCodes | int[] | 재시도 대상 HTTP 상태 코드 | [429, 500, 502, 503, 504] |
-| respectRetryAfter | boolean | Retry-After 헤더 준수 여부 | true |
-
-#### 출력 (Output)
-
+##### 출력 (Output)
 | 항목 | 타입 | 설명 |
 |------|------|------|
-| response | HttpResponseMessage | HTTP 응답 |
-| attemptCount | int | 총 시도 횟수 |
+| result | T | 성공 시 함수 반환값 |
 
-#### 예외 / 오류
-
+##### 예외 / 오류
 | 조건 | 오류 코드 | 설명 |
 |------|-----------|------|
-| 재시도 소진 | ERR_HTTP_RETRY_EXHAUSTED | 최대 재시도 후에도 실패 |
-| 네트워크 오류 | ERR_HTTP_NETWORK | 네트워크 연결 불가 |
-| 비재시도 오류 | ERR_HTTP_NON_RETRYABLE | 재시도 대상이 아닌 오류 (400, 404 등) |
+| 모든 재시도 소진 | ERR_MAX_RETRIES | 최대 재시도 후에도 실패 |
+| 타임아웃 | ERR_TIMEOUT | 단일 호출 타임아웃 초과 |
 
 ### 처리 흐름
 
-1. **요청 실행**: HTTP 요청을 전송한다.
-2. **응답 확인**: 성공(2xx)이면 즉시 반환한다.
-3. **재시도 판정**: 응답 상태 코드가 retryableStatusCodes에 포함되는지 확인한다.
-   - 포함되지 않으면 비재시도 오류로 즉시 반환한다.
-4. **대기 시간 계산**:
-   - HTTP 429: `Retry-After` 헤더가 있으면 해당 값 사용 (MAIL-06)
-   - Exponential: `baseDelayMs * 2^(attemptCount-1)` (AUTH-04: 1초/2초/4초)
-   - Fixed: `baseDelayMs` 고정
-5. **대기 후 재시도**: 계산된 시간만큼 대기 후 요청을 재전송한다.
-6. **최대 횟수 초과**: maxRetries 초과 시 ERR_HTTP_RETRY_EXHAUSTED를 반환한다.
-
 ```mermaid
 flowchart TD
-    A[HTTP 요청 전송] --> B{응답 2xx?}
-    B -- 예 --> C[응답 반환]
-    B -- 아니오 --> D{재시도 대상 상태 코드?}
-    D -- 아니오 --> E[ERR_HTTP_NON_RETRYABLE]
-    D -- 예 --> F{재시도 횟수 < max?}
-    F -- 아니오 --> G[ERR_HTTP_RETRY_EXHAUSTED]
-    F -- 예 --> H[대기 시간 계산]
-    H --> I[대기]
-    I --> A
+    A[함수 호출] --> B{attempt <= maxRetries?}
+    B -- 아니오 --> C[ERR_MAX_RETRIES 발생]
+    B -- 예 --> D[fn 실행 + 타임아웃 적용]
+    D --> E{성공?}
+    E -- 예 --> F[결과 반환]
+    E -- 아니오 --> G{shouldRetry?}
+    G -- 아니오 --> H[오류 즉시 발생]
+    G -- 예 --> I[onRetry 콜백 호출]
+    I --> J[delayMs 대기]
+    J --> K[attempt++]
+    K --> B
 ```
+
+### 사전 정의 프리셋
+
+| 프리셋 | maxRetries | delayMs | timeoutMs | 용도 |
+|--------|-----------|---------|-----------|------|
+| IMAP 연결 | 3 | 10000 | 30000 | MAIL-R-003 |
+| Claude API 호출 | 2 | 5000 | 60000 | TERM-R-007, TERM-R-008 |
 
 ### 구현 가이드
 
-- **패턴**: Decorator/DelegatingHandler 패턴으로 HttpClient 파이프라인에 통합.
-- **동시성**: 각 요청은 독립적으로 재시도 카운트를 관리한다.
-- **성능**: 대기 중 스레드를 점유하지 않도록 비동기(async/await) 방식으로 구현한다.
-- **외부 의존성**: HttpClient (DI를 통한 HttpClientFactory 활용 권장)
+- **패턴**: Higher-Order Function (함수 래퍼)
+- **동시성**: 호출자 단위로 독립 실행, 공유 상태 없음
+- **성능**: 불필요한 재시도 방지를 위해 shouldRetry로 4xx 오류는 재시도하지 않음
+- **외부 의존성**: 없음 (순수 유틸리티)
 
 ### 관련 기능
-
-- **이 기능을 호출하는 기능**: CMN-AUTH-001, MAIL-RECV-001, MAIL-PROC-002, TERM-GEN-001
+- **이 기능을 호출하는 기능**: MAIL-RECV-001 (IMAP 연결), TERM-GEN-001 (Claude API 호출)
 - **이 기능이 호출하는 기능**: CMN-LOG-001 (재시도 로깅)
 
 ### 테스트 시나리오
 
 | 시나리오 | 입력 조건 | 기대 결과 |
 |----------|-----------|-----------|
-| 즉시 성공 | 200 응답 | 응답 반환, attemptCount=1 |
-| 1회 실패 후 성공 | 첫 요청 500, 두 번째 200 | 응답 반환, attemptCount=2 |
-| 재시도 소진 | 3회 연속 500 | ERR_HTTP_RETRY_EXHAUSTED |
-| Rate Limit 대응 | 429 + Retry-After: 5 | 5초 대기 후 재시도 |
-| 지수 백오프 | Exponential, base=1000ms | 1초, 2초, 4초 간격 |
-| 비재시도 오류 | 400 응답 | 즉시 ERR_HTTP_NON_RETRYABLE |
-| 네트워크 오류 | 연결 불가 | ERR_HTTP_NETWORK |
+| 첫 시도 성공 | fn이 즉시 성공 | 결과 반환, 재시도 없음 |
+| 2회차 성공 | 1회 실패 후 2회 성공 | 결과 반환 |
+| 모든 재시도 실패 | maxRetries회 모두 실패 | ERR_MAX_RETRIES |
+| 타임아웃 | fn이 timeoutMs 초과 | ERR_TIMEOUT 후 재시도 |
+| 재시도 불가 오류 | shouldRetry가 false 반환 | 즉시 오류 발생 |

@@ -1,95 +1,99 @@
 # MailProcessingLog 데이터 정의
 
 ## 개요
-
-처리 완료된 메일의 기록을 관리하는 엔티티이다. 메일의 Message ID를 저장하여 중복 처리를 방지한다 (POL-MAIL MAIL-03). 메일 본문 자체는 DB에 저장하지 않고 로컬 텍스트 파일로만 관리한다.
+- 백그라운드 메일 수신/분석 프로세스의 실행 이력을 기록한다.
+- 프론트엔드 "서비스 상태 조회" 페이지에서 마지막 실행 시점과 결과를 표시하는 데 사용한다.
+- 관련 도메인: 메일 (POL-MAIL, POL-DATA)
 
 ---
 
-## DATA-002 MailProcessingLog
+## DATA-003 MailProcessingLog
 
 ### 엔티티 정보
-
 | 항목 | 내용 |
 |------|------|
 | 엔티티명 (논리) | MailProcessingLog |
 | 테이블명 (물리) | mail_processing_logs |
-| 설명 | 처리 완료된 메일 기록 (중복 수신 방지) |
-| 데이터베이스 | SQLite 3 |
-| 파티셔닝 | 없음 |
+| 설명 | 메일 수신/분석 프로세스 실행 이력 |
+| 데이터베이스 | SQLite (better-sqlite3 + Drizzle ORM) |
+| 파티셔닝 | 없음 (90일 보존 후 하드 삭제) |
 
 ### 필드 정의
 
 | 필드명 | 컬럼명 | 타입 | 길이 | NOT NULL | 기본값 | 설명 | 개인정보 |
 |--------|--------|------|------|----------|--------|------|---------|
-| id | id | INTEGER | - | ✅ | AUTOINCREMENT | 기본 키 | |
-| messageId | message_id | TEXT | 255 | ✅ | - | 메일 Message ID (고유) | |
-| messageIdHash | message_id_hash | TEXT | 8 | ✅ | - | Message ID의 SHA256 해시 앞 8자리 | |
-| subject | subject | TEXT | - | - | NULL | 메일 제목 (참조용) | |
-| receivedAt | received_at | TEXT | - | ✅ | - | 메일 수신 일시 (ISO 8601) | |
-| fileName | file_name | TEXT | 255 | ✅ | - | 저장된 분석 요청 파일명 | |
-| status | status | TEXT | 20 | ✅ | 'SAVED' | 처리 상태 | |
-| createdAt | created_at | TEXT | - | ✅ | datetime('now') | 레코드 생성일시 | |
-| updatedAt | updated_at | TEXT | - | ✅ | datetime('now') | 레코드 수정일시 | |
-
-### status 필드 값 정의
-
-| 값 | 설명 |
-|----|------|
-| SAVED | 메일 내용이 분석 요청 파일로 저장됨 |
-| ANALYZED | 분석 완료 (용어 추출 및 해설 생성 완료) |
-| ERROR | 처리 중 오류 발생 |
+| id | id | TEXT | 36 | YES | - | 기본 키 (UUID) | |
+| executedAt | executed_at | TEXT | - | YES | - | 작업 실행 시작 일시 | |
+| completedAt | completed_at | TEXT | - | NO | `NULL` | 작업 완료 일시 | |
+| processType | process_type | TEXT | 20 | YES | - | 프로세스 유형 (`mail_receive` / `term_analysis`) | |
+| status | status | TEXT | 20 | YES | - | 실행 결과 (`success` / `failure` / `skipped`) | |
+| mailCount | mail_count | INTEGER | - | NO | `0` | 처리된 메일 건수 | |
+| analyzedCount | analyzed_count | INTEGER | - | NO | `0` | 분석 완료된 파일 건수 | |
+| errorMessage | error_message | TEXT | 1000 | NO | `NULL` | 오류 발생 시 오류 메시지 | |
+| createdAt | created_at | TEXT | - | YES | `datetime('now')` | 레코드 생성 일시 | |
+| updatedAt | updated_at | TEXT | - | YES | `datetime('now')` | 레코드 수정 일시 | |
 
 ### 인덱스 정의
 
 | 인덱스명 | 대상 컬럼 | 타입 | 유니크 | 설명 |
 |----------|-----------|------|--------|------|
-| uq_mail_processing_logs_message_id | message_id | BTREE | ✅ | Message ID 중복 방지 |
-| idx_mail_processing_logs_status | status | BTREE | - | 상태별 조회 |
-| idx_mail_processing_logs_received_at | received_at | BTREE | - | 수신일시 기준 정렬 조회 |
+| idx_mpl_executed_at | executed_at | BTREE | NO | 실행 일시 기준 정렬/조회 (최신순) |
+| idx_mpl_process_type | process_type | BTREE | NO | 프로세스 유형별 필터 |
+| idx_mpl_status | status | BTREE | NO | 상태별 필터 |
 
 ### 관계 정의
 
 | 관계 | 대상 엔티티 | 종류 | 외래 키 | 설명 |
 |------|------------|------|---------|------|
-| - | - | - | - | 독립 엔티티 (파일명으로 분석 요청 파일과 논리적 연결) |
+| - | - | - | - | 독립 엔티티, FK 관계 없음 |
 
 ### DDL
 
 ```sql
-CREATE TABLE IF NOT EXISTS mail_processing_logs (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    message_id       TEXT    NOT NULL UNIQUE,
-    message_id_hash  TEXT    NOT NULL,
-    subject          TEXT,
-    received_at      TEXT    NOT NULL,
-    file_name        TEXT    NOT NULL,
-    status           TEXT    NOT NULL DEFAULT 'SAVED'
-                             CHECK (status IN ('SAVED', 'ANALYZED', 'ERROR')),
-    created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+CREATE TABLE mail_processing_logs (
+    id TEXT PRIMARY KEY,
+    executed_at TEXT NOT NULL,
+    completed_at TEXT,
+    process_type TEXT NOT NULL CHECK (process_type IN ('mail_receive', 'term_analysis')),
+    status TEXT NOT NULL CHECK (status IN ('success', 'failure', 'skipped')),
+    mail_count INTEGER DEFAULT 0,
+    analyzed_count INTEGER DEFAULT 0,
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_mail_processing_logs_message_id
-    ON mail_processing_logs(message_id);
+CREATE INDEX idx_mpl_executed_at ON mail_processing_logs(executed_at);
+CREATE INDEX idx_mpl_process_type ON mail_processing_logs(process_type);
+CREATE INDEX idx_mpl_status ON mail_processing_logs(status);
+```
 
-CREATE INDEX IF NOT EXISTS idx_mail_processing_logs_status
-    ON mail_processing_logs(status);
+### Drizzle ORM 스키마 예시
 
-CREATE INDEX IF NOT EXISTS idx_mail_processing_logs_received_at
-    ON mail_processing_logs(received_at);
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+export const mailProcessingLogs = sqliteTable('mail_processing_logs', {
+  id: text('id').primaryKey(),
+  executedAt: text('executed_at').notNull(),
+  completedAt: text('completed_at'),
+  processType: text('process_type', { enum: ['mail_receive', 'term_analysis'] }).notNull(),
+  status: text('status', { enum: ['success', 'failure', 'skipped'] }).notNull(),
+  mailCount: integer('mail_count').default(0),
+  analyzedCount: integer('analyzed_count').default(0),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
 ```
 
 ### 비즈니스 규칙
-
-- 메일 수신 시 `message_id`로 중복 여부를 확인한다. 이미 존재하면 해당 메일을 건너뛴다 (POL-MAIL MAIL-03).
-- `message_id_hash`는 파일명 생성에 사용된다 (POL-DATA DATA-02: `{수신일시}_{MessageID해시}.txt`).
-- 분석 완료 시 status를 `ANALYZED`로 변경하고, 원본 파일은 `Processed/` 디렉터리로 이동한다 (POL-DATA DATA-06).
-- 처리 오류 시 status를 `ERROR`로 변경한다.
-- 메일 본문, 발신자 이메일 등 개인정보가 포함될 수 있는 데이터는 이 테이블에 저장하지 않는다. 분석 요청 파일에만 존재한다.
+- **실행 기록 필수**: 매 메일 확인/분석 작업 완료 시 결과를 기록한다 (POL-MAIL MAIL-R-014).
+- **서비스 상태 표시**: 최신 레코드의 `executed_at`과 `status`를 프론트엔드에 표시한다 (POL-MAIL MAIL-R-015).
+- **보존 기간**: 90일 경과 데이터는 하드 삭제 (POL-DATA DATA-R-016).
+- **삭제 시점**: 메일 확인 주기 실행 시 90일 초과 레코드 자동 삭제.
+- **프로세스 유형 구분**: `mail_receive`(메일 수신)와 `term_analysis`(용어 분석)를 별도 레코드로 기록.
 
 ### 마이그레이션 고려사항
-
-- 앱 최초 실행 시 테이블을 자동 생성한다.
-- seed 데이터 불필요.
-- 대량 메일 처리 시 레코드가 누적되므로, 향후 오래된 레코드의 아카이빙/정리 정책을 고려할 수 있다.
+- **초기 데이터**: 불필요 (서비스 실행 시 자동 생성됨).
+- **보존 정책 변경 시**: 삭제 스케줄러의 기준일 설정만 변경하면 됨.

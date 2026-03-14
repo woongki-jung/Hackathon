@@ -1,190 +1,255 @@
-# 환경설정 서비스 인터페이스 정의
+# Config API 정의
 
 ## 개요
-
-- 본 문서는 앱 내부의 환경설정 서비스 계층 인터페이스를 정의한다.
-- 환경설정 서비스는 앱의 설정 값을 읽고, 저장하고, 유효성을 검증하는 역할을 담당한다.
-- 설정 값의 원본은 환경변수 또는 암호화된 로컬 설정 파일이다.
-- 관련 정책: POL-AUTH (AUTH-02), POL-MAIL (MAIL-01, MAIL-02, MAIL-03), POL-UI (UI-03)
-
----
-
-## CFG-001: 설정 읽기
-
-### 기본 정보
-
-| 항목 | 내용 |
-|------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 앱 환경설정 값을 조회하여 반환한다 |
-
-### 입력
-
-| 파라미터 | 타입 | 필수 | 설명 |
-|----------|------|------|------|
-| key | string | 조건부 | 특정 설정 키. 미지정 시 전체 설정 반환 |
-
-### 출력: 전체 설정 객체
-
-```json
-{
-  "mail": {
-    "userEmail": "user@example.com",
-    "mailboxName": "Inbox",
-    "pollIntervalSeconds": 60,
-    "fetchUnreadOnly": true,
-    "maxFetchCount": 50
-  },
-  "storage": {
-    "analysisDir": "C:\\App\\AnalysisRequests"
-  },
-  "analysis": {
-    "maxDailyApiCalls": 200,
-    "stopWords": ["IT", "OK", "PM", "AM"]
-  },
-  "auth": {
-    "graphConnected": true,
-    "claudeConnected": true
-  }
-}
-```
-
-| 필드 | 타입 | 기본값 | 설명 |
-|------|------|--------|------|
-| mail.userEmail | string | - | 메일 계정 이메일 주소 (`MAIL_USER_EMAIL`) |
-| mail.mailboxName | string | "Inbox" | 모니터링 대상 메일함 이름 |
-| mail.pollIntervalSeconds | integer | 60 | 메일함 확인 주기 (초) |
-| mail.fetchUnreadOnly | boolean | true | 읽지 않은 메일만 조회 여부 |
-| mail.maxFetchCount | integer | 50 | 1회 조회 최대 건수 |
-| storage.analysisDir | string | "{앱경로}/AnalysisRequests" | 분석 요청 폴더 경로 |
-| analysis.maxDailyApiCalls | integer | 200 | 일일 최대 Claude API 호출 횟수 |
-| analysis.stopWords | array of string | (기본 불용어 목록) | 용어 추출 시 제외할 불용어 목록 |
-| auth.graphConnected | boolean | - | Microsoft Graph API 연결 상태 |
-| auth.claudeConnected | boolean | - | Claude API 연결 상태 |
-
-### 비즈니스 규칙
-
-- 인증 정보(시크릿, 토큰, API 키)는 반환 값에 포함하지 않는다. 연결 상태(boolean)만 반환한다 (POL-AUTH).
-- 환경변수에 값이 없는 경우 각 항목의 기본값을 반환한다.
+- 시스템 환경설정(IMAP 서버 정보 등) 조회 및 수정 API를 정의한다. 관리자 전용 API이다.
+- 관련 도메인 객체: AppSetting (DATA-002)
+- 관련 기능: CMN-CFG-001 (환경설정 관리)
+- 관련 정책: POL-AUTH (AUTH-R-014, AUTH-R-017, AUTH-R-020), POL-DATA (DATA-R-020)
 
 ---
 
-## CFG-002: 설정 저장
+## CFG-001 환경설정 조회
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 사용자가 변경한 환경설정 값을 저장하고 즉시 반영한다 |
+| 메서드 | GET |
+| 경로 | /api/config |
+| 인증 | 필요 |
+| 권한 | admin |
+| 설명 | 시스템 환경설정 값을 조회한다 (관리자 전용) |
 
-### 입력
+### 요청
 
-```json
-{
-  "mail": {
-    "mailboxName": "Inbox",
-    "pollIntervalSeconds": 120,
-    "fetchUnreadOnly": true,
-    "maxFetchCount": 30
-  },
-  "storage": {
-    "analysisDir": "D:\\Custom\\AnalysisRequests"
-  },
-  "analysis": {
-    "maxDailyApiCalls": 100,
-    "stopWords": ["IT", "OK", "PM", "AM", "HR"]
-  }
-}
+파라미터 없음.
+
+#### 요청 예시
+```http
+GET /api/config HTTP/1.1
+Cookie: mail-term-session=...
 ```
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| mail.mailboxName | string | ✅ | 모니터링 대상 메일함 이름 |
-| mail.pollIntervalSeconds | integer | ✅ | 메일함 확인 주기 (초, 30~3600) |
-| mail.fetchUnreadOnly | boolean | ✅ | 읽지 않은 메일만 조회 여부 |
-| mail.maxFetchCount | integer | ✅ | 1회 조회 최대 건수 (1~100) |
-| storage.analysisDir | string | ✅ | 분석 요청 폴더 경로 |
-| analysis.maxDailyApiCalls | integer | ✅ | 일일 최대 API 호출 횟수 (1~1000) |
-| analysis.stopWords | array of string | ✅ | 불용어 목록 |
+### 응답
 
-### 출력
-
+#### 성공 응답 (200 OK)
 ```json
 {
   "success": true,
+  "data": {
+    "mail": {
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993,
+      "imapUsername": "user@example.com",
+      "useSsl": true,
+      "checkInterval": 3600000,
+      "passwordConfigured": true
+    },
+    "analysis": {
+      "model": "claude-sonnet-4-6",
+      "apiKeyConfigured": true
+    }
+  }
+}
+```
+
+| 필드 | 타입 | 설명 | 출처 |
+|------|------|------|------|
+| mail.imapHost | string / null | IMAP 서버 호스트 | DB (mail.imap.host) |
+| mail.imapPort | number / null | IMAP 서버 포트 | DB (mail.imap.port) |
+| mail.imapUsername | string / null | IMAP 로그인 아이디 | DB (mail.imap.username) |
+| mail.useSsl | boolean | SSL/TLS 사용 여부 | DB (mail.imap.use_ssl) |
+| mail.checkInterval | number | 메일 확인 주기 (ms) | DB (mail.check_interval) |
+| mail.passwordConfigured | boolean | IMAP 비밀번호 설정 여부 | 환경변수 MAIL_PASSWORD 존재 여부 |
+| analysis.model | string | Claude API 모델명 | DB (analysis.model) |
+| analysis.apiKeyConfigured | boolean | Claude API 키 설정 여부 | 환경변수 ANTHROPIC_API_KEY 존재 여부 |
+
+> AUTH-R-017, AUTH-R-018: IMAP 비밀번호와 Claude API 키는 응답에 포함하지 않는다. 설정 여부만 boolean으로 반환한다 (AUTH-R-020).
+
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 | 관련 정책 |
+|-----------|-----------|------|-----------|
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 | AUTH-R-012 |
+| 403 | FORBIDDEN | 관리자 권한 필요 | AUTH-R-014 |
+
+### 비즈니스 규칙
+- 민감정보(비밀번호, API 키)는 마스킹하여 반환한다. `passwordConfigured`와 `apiKeyConfigured`로 설정 여부만 boolean으로 표시한다 (AUTH-R-020).
+- 환경변수(`.env.local`)의 내용은 웹 API를 통해 직접 반환하지 않는다 (POL-DATA DATA-R-020).
+- DB에 설정값이 없는 경우 `null`을 반환한다.
+
+### 관련 기능
+- CMN-CFG-001 (환경설정 조회)
+
+---
+
+## CFG-002 환경설정 수정
+
+### 기본 정보
+| 항목 | 내용 |
+|------|------|
+| 메서드 | PUT |
+| 경로 | /api/config |
+| 인증 | 필요 |
+| 권한 | admin |
+| 설명 | 시스템 환경설정 값을 수정한다 (관리자 전용) |
+
+### 요청
+
+#### Request Body
+```json
+{
+  "mail": {
+    "imapHost": "string (IMAP 서버 호스트, 선택)",
+    "imapPort": "number (IMAP 포트, 선택)",
+    "imapUsername": "string (IMAP 아이디, 선택)",
+    "useSsl": "boolean (SSL 사용 여부, 선택)",
+    "checkInterval": "number (확인 주기 ms, 선택)"
+  },
+  "analysis": {
+    "model": "string (Claude 모델명, 선택)"
+  }
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 | 유효성 규칙 |
+|------|------|------|------|-------------|
+| mail.imapHost | string | ❌ | IMAP 서버 호스트 | 빈 문자열 불가 |
+| mail.imapPort | number | ❌ | IMAP 포트 | 1~65535 범위 |
+| mail.imapUsername | string | ❌ | IMAP 로그인 아이디 | 이메일 형식 권장 |
+| mail.useSsl | boolean | ❌ | SSL/TLS 사용 여부 | - |
+| mail.checkInterval | number | ❌ | 메일 확인 주기 (ms) | 최소 60000 (1분) |
+| analysis.model | string | ❌ | Claude API 모델명 | 빈 문자열 불가 |
+
+> 요청 본문에 포함된 필드만 업데이트한다 (Partial Update). 포함되지 않은 필드는 기존 값을 유지한다.
+
+#### 요청 예시
+```http
+PUT /api/config HTTP/1.1
+Content-Type: application/json
+Cookie: mail-term-session=...
+
+{
+  "mail": {
+    "imapHost": "imap.gmail.com",
+    "imapPort": 993,
+    "useSsl": true
+  }
+}
+```
+
+### 응답
+
+#### 성공 응답 (200 OK)
+```json
+{
+  "success": true,
+  "data": {
+    "mail": {
+      "imapHost": "imap.gmail.com",
+      "imapPort": 993,
+      "imapUsername": "user@example.com",
+      "useSsl": true,
+      "checkInterval": 3600000,
+      "passwordConfigured": true
+    },
+    "analysis": {
+      "model": "claude-sonnet-4-6",
+      "apiKeyConfigured": true
+    }
+  },
   "message": "설정이 저장되었습니다."
 }
 ```
 
-### 에러
+> 수정 성공 후 전체 설정을 CFG-001과 동일한 형식으로 반환한다.
 
-| 에러 코드 | 설명 |
-|-----------|------|
-| VALIDATION_ERROR | 설정 값이 유효하지 않음 (CFG-003 참조) |
-| STORAGE_ERROR | 설정 파일 저장 실패 (디스크 접근 권한 등) |
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 | 관련 정책 |
+|-----------|-----------|------|-----------|
+| 400 | VALIDATION_ERROR | 유효성 검증 실패 (포트 범위, 주기 최소값 등) | - |
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 | AUTH-R-012 |
+| 403 | FORBIDDEN | 관리자 권한 필요 | AUTH-R-014 |
 
 ### 비즈니스 규칙
+- 환경설정 변경은 관리자만 가능하다 (AUTH-R-014).
+- DB의 `app_settings` 테이블에 키-값으로 저장한다.
+- 환경변수(MAIL_PASSWORD, ANTHROPIC_API_KEY)는 이 API로 변경할 수 없다 (POL-DATA DATA-R-020). 서버의 `.env.local` 파일을 직접 수정해야 한다.
+- `updatedAt` 필드를 현재 시간으로 갱신한다.
 
-- 저장 전 반드시 CFG-003 유효성 검증을 수행한다.
-- 설정 변경은 앱 재시작 없이 즉시 반영된다 (UI-03).
-- `mail.userEmail` 및 인증 정보는 이 인터페이스로 변경할 수 없다 (환경변수로만 관리).
+### 관련 기능
+- CMN-CFG-001 (환경설정 저장)
 
 ---
 
-## CFG-003: 설정 유효성 검증
+## CFG-003 메일 서버 연결 테스트
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
-| 유형 | 내부 서비스 호출 |
-| 설명 | 설정 값의 범위, 형식, 접근 가능 여부를 검증한다 |
+| 메서드 | POST |
+| 경로 | /api/config/test-mail |
+| 인증 | 필요 |
+| 권한 | admin |
+| 설명 | 현재 설정된 IMAP 서버로 테스트 연결을 시도한다 (관리자 전용) |
 
-### 입력
+### 요청
 
-CFG-002와 동일한 설정 객체
+Request Body 없음. DB에 저장된 설정값과 환경변수의 비밀번호를 사용하여 테스트한다.
 
-### 출력
+#### 요청 예시
+```http
+POST /api/config/test-mail HTTP/1.1
+Cookie: mail-term-session=...
+```
 
+### 응답
+
+#### 성공 응답 (200 OK) - 연결 성공
 ```json
 {
-  "valid": true,
-  "errors": []
+  "success": true,
+  "data": {
+    "connected": true,
+    "mailboxExists": true,
+    "unseenCount": 5
+  },
+  "message": "메일 서버 연결에 성공했습니다."
 }
 ```
 
-또는 유효하지 않은 경우:
-
-```json
-{
-  "valid": false,
-  "errors": [
-    {
-      "field": "mail.pollIntervalSeconds",
-      "message": "폴링 주기는 30~3600초 범위여야 합니다.",
-      "currentValue": 10
-    },
-    {
-      "field": "storage.analysisDir",
-      "message": "지정된 경로에 대한 쓰기 권한이 없습니다.",
-      "currentValue": "C:\\Windows\\System32"
-    }
-  ]
-}
-```
-
-### 검증 규칙
-
-| 필드 | 규칙 | 참조 |
+| 필드 | 타입 | 설명 |
 |------|------|------|
-| mail.pollIntervalSeconds | 30 이상, 3600 이하. 범위 밖이면 기본값(60) 적용 후 경고 | MAIL-01 |
-| mail.maxFetchCount | 1 이상, 100 이하 | MAIL-03 |
-| storage.analysisDir | 디렉터리 존재 여부 확인, 쓰기 권한 확인 | DATA-01 |
-| analysis.maxDailyApiCalls | 1 이상, 1000 이하 | POL-TERM |
+| connected | boolean | IMAP 서버 연결 성공 여부 |
+| mailboxExists | boolean | INBOX 폴더 존재 여부 |
+| unseenCount | number | 읽지 않은 메일 건수 |
+
+#### 성공 응답 (200 OK) - 연결 실패
+```json
+{
+  "success": true,
+  "data": {
+    "connected": false,
+    "error": "IMAP 서버에 연결할 수 없습니다. 호스트와 포트를 확인해주세요."
+  },
+  "message": "메일 서버 연결에 실패했습니다."
+}
+```
+
+> 연결 테스트는 비즈니스 로직으로서, IMAP 연결 실패도 200 OK로 응답하되 `connected: false`로 결과를 전달한다.
+
+#### 에러 응답
+| 상태 코드 | 에러 코드 | 설명 | 관련 정책 |
+|-----------|-----------|------|-----------|
+| 400 | INVALID_REQUEST | IMAP 설정이 완료되지 않음 (호스트/포트 미설정) | MAIL-R-002 |
+| 401 | UNAUTHORIZED | 세션 없음 또는 만료 | AUTH-R-012 |
+| 403 | FORBIDDEN | 관리자 권한 필요 | AUTH-R-014 |
 
 ### 비즈니스 규칙
+- DB에 저장된 IMAP 설정(호스트, 포트, 아이디, SSL)과 환경변수의 비밀번호(MAIL_PASSWORD)를 조합하여 테스트 연결한다.
+- IMAP 호스트 또는 포트가 미설정이면 400을 반환한다 (MAIL-R-002).
+- 연결 타임아웃은 10초로 설정한다.
+- SSL/TLS 사용 여부는 설정값에 따른다 (MAIL-R-001).
+- 테스트 연결 후 즉시 연결을 해제한다 (메일을 가져오지 않음).
 
-- 범위를 벗어난 `pollIntervalSeconds` 값은 기본값(60)을 적용하고 경고 로그를 출력한다 (MAIL-01).
-- `analysisDir` 경로에 한글 또는 공백이 포함되어도 정상 동작해야 한다 (DATA-01).
-- 디렉터리가 존재하지 않는 경우 자동 생성을 시도한다 (DATA-01).
+### 관련 기능
+- MAIL-RECV-001 (IMAP 메일 수신 - 연결 부분만 사용)
+- CMN-CFG-001 (설정값 조회)

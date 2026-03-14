@@ -2,43 +2,35 @@
 
 ## 개요
 
-본 문서는 메일 수신 용어 해설 업무 지원 도구의 인터페이스 정의를 총괄합니다.
-본 프로젝트는 Windows 데스크톱 애플리케이션(.NET 10)으로, 자체 REST API 서버를 노출하지 않으며, 외부 시스템(Microsoft Graph API, Claude API)을 **호출**하는 클라이언트 측 인터페이스와 내부 서비스 계층 간 인터페이스를 정의합니다.
-
 ### API 설계 원칙
+- Next.js 15 App Router의 Route Handlers (`app/api/`)를 사용하여 REST API를 제공한다.
+- 리소스 중심의 RESTful 설계를 기본으로 하되, CRUD로 표현하기 어려운 비즈니스 액션은 동사형 경로를 허용한다.
+- 모든 API는 HTTPS 전용이며, JSON 형식으로 요청/응답한다.
+- 멱등성: GET, PUT, DELETE는 멱등성을 보장한다.
 
-- **외부 API 호출**: Microsoft Graph API, Anthropic Claude API의 공식 명세를 준수하며, 본 문서에서는 앱에서 사용하는 엔드포인트와 요청/응답 형식만 정의한다.
-- **내부 서비스 인터페이스**: 앱 내부 서비스 계층 간 계약을 정의하여 구현 시 모듈 간 결합도를 낮춘다.
-- **인증 정보 보호**: 모든 인증 정보(토큰, 시크릿)는 로그 및 응답 예시에 포함하지 않는다.
-- **오류 처리 표준화**: 외부 API 호출 실패 시 재시도 정책(POL-AUTH, POL-MAIL 참조)을 일관되게 적용한다.
-
-### 인터페이스 분류
-
-| 분류 | 설명 |
-|------|------|
-| External - Graph API | Microsoft Graph API 호출 (메일 수신, 상태 변경) |
-| External - Claude API | Anthropic Claude API 호출 (용어 해설 생성) |
-| Internal - Config | 환경설정 읽기/쓰기 서비스 인터페이스 |
-| Internal - Mail | 메일 수신 및 파일 저장 서비스 인터페이스 |
-| Internal - Analysis | 용어 분석 및 사전 관리 서비스 인터페이스 |
-| Internal - Dictionary | 용어 사전 조회/검색 서비스 인터페이스 |
+### 기본 URL
+- Base URL: `/api`
+- 버전 관리: 현재 버전 접두사 없음 (v1 불필요, 단일 서비스 내부 API)
 
 ### 인증 방식
+- **iron-session** 기반 암호화 HTTP-only 쿠키 세션 (POL-AUTH AUTH-R-009)
+- 세션 유효 기간: 24시간 (POL-AUTH AUTH-R-010)
+- 세션 데이터: `{ userId: string, username: string, role: "admin" | "user" }`
+- 미인증 접근 시: API는 401 Unauthorized 반환 (POL-AUTH AUTH-R-012)
 
-| 대상 | 인증 방식 | 참조 |
-|------|-----------|------|
-| Microsoft Graph API | OAuth 2.0 Client Credentials Flow (Bearer Token) | POL-AUTH, AUTH-01 |
-| Anthropic Claude API | API Key (`x-api-key` 헤더) | POL-AUTH, AUTH-04 |
+### 역할 기반 접근 제어
+| 역할 | 설명 | 접근 범위 |
+|------|------|-----------|
+| admin | 관리자 | 모든 API |
+| user | 일반 사용자 | 조회 API (용어사전, 분석 결과, 서비스 상태) |
 
-### 공통 오류 처리 정책
+### 인증 불필요 엔드포인트
+- `POST /api/auth/login` - 로그인
+- `GET /api/health` - 헬스체크 (POL-AUTH 예외 사항)
 
-- HTTP 429 (Rate Limit): `Retry-After` 헤더 값만큼 대기 후 재시도
-- HTTP 401/403 (인증 실패): 토큰 갱신 후 재시도 (최대 3회)
-- HTTP 5xx (서버 오류): 지수 백오프로 재시도 (최대 3회, 1초/2초/4초)
-- 네트워크 오류: 다음 폴링 주기까지 대기
+---
 
 ## 진행 상태 범례
-
 - ✅ 정의 완료
 - 🔄 검토 중
 - 📋 정의 예정
@@ -46,64 +38,169 @@
 
 ## API 목록
 
-### External - Microsoft Graph API
+### 인증 (Auth)
 
-| 코드 | 이름 | 메서드 | 경로 | 설명 | 상태 |
-|------|------|--------|------|------|------|
-| GRAPH-001 | OAuth 토큰 발급 | POST | /oauth2/v2.0/token | Azure AD 액세스 토큰 발급 | ✅ |
-| GRAPH-002 | 메일 목록 조회 | GET | /v1.0/users/{userId}/mailFolders/{folderId}/messages | 메일함의 메일 목록 조회 | ✅ |
-| GRAPH-003 | 메일 상세 조회 | GET | /v1.0/users/{userId}/messages/{messageId} | 개별 메일 내용 조회 | ✅ |
-| GRAPH-004 | 메일 읽음 처리 | PATCH | /v1.0/users/{userId}/messages/{messageId} | 메일 읽음 상태 변경 | ✅ |
-| GRAPH-005 | 메일함 폴더 조회 | GET | /v1.0/users/{userId}/mailFolders | 메일함 폴더 목록 조회 | ✅ |
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| AUTH-001 | 로그인 | Auth | POST | /api/auth/login | 불필요 | - | ✅ |
+| AUTH-002 | 로그아웃 | Auth | POST | /api/auth/logout | 필요 | all | ✅ |
+| AUTH-003 | 현재 사용자 조회 | Auth | GET | /api/auth/me | 필요 | all | ✅ |
 
-### External - Anthropic Claude API
+### 사용자 관리 (User)
 
-| 코드 | 이름 | 메서드 | 경로 | 설명 | 상태 |
-|------|------|--------|------|------|------|
-| CLAUDE-001 | 용어 해설 생성 | POST | /v1/messages | Claude API로 용어 해설 텍스트 생성 | ✅ |
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| USER-001 | 사용자 목록 조회 | User | GET | /api/users | 필요 | admin | ✅ |
+| USER-002 | 사용자 등록 | User | POST | /api/users | 필요 | admin | ✅ |
+| USER-003 | 사용자 삭제 | User | DELETE | /api/users/:id | 필요 | admin | ✅ |
 
-### Internal - Config Service
+### 환경설정 (Config)
 
-| 코드 | 이름 | 설명 | 상태 |
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| CFG-001 | 환경설정 조회 | Config | GET | /api/config | 필요 | admin | ✅ |
+| CFG-002 | 환경설정 수정 | Config | PUT | /api/config | 필요 | admin | ✅ |
+| CFG-003 | 메일 서버 연결 테스트 | Config | POST | /api/config/test-mail | 필요 | admin | ✅ |
+
+### 메일 (Mail)
+
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| MAIL-001 | 서비스 상태 조회 | Mail | GET | /api/mail/status | 필요 | all | ✅ |
+| MAIL-002 | 수동 메일 확인 트리거 | Mail | POST | /api/mail/check | 필요 | admin | ✅ |
+
+### 분석 결과 (Analysis)
+
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| ANAL-001 | 최신 분석 결과 조회 | Analysis | GET | /api/analysis/latest | 필요 | all | ✅ |
+| ANAL-002 | 분석 이력 조회 | Analysis | GET | /api/analysis/history | 필요 | all | ✅ |
+
+### 용어사전 (Dictionary)
+
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| DICT-001 | 용어 검색 | Dictionary | GET | /api/dictionary/search | 필요 | all | ✅ |
+| DICT-002 | 빈도 트렌드 조회 | Dictionary | GET | /api/dictionary/trending | 필요 | all | ✅ |
+| DICT-003 | 용어 상세 조회 | Dictionary | GET | /api/dictionary/terms/:id | 필요 | all | ✅ |
+
+### 외부 연동 (External)
+
+| 코드 | 이름 | 그룹 | 메서드 | 경로 | 인증 | 권한 | 상태 |
+|------|------|------|--------|------|------|------|------|
+| CLAUDE-001 | Claude API 호출 | External | - | (서버 사이드 전용) | - | - | ✅ |
+
+---
+
+## 공통 규격
+
+### 요청 헤더
+
+| 헤더 | 값 | 필수 | 설명 |
+|------|-----|------|------|
+| Content-Type | application/json | 조건부 | POST/PUT 요청 시 필수 |
+| Cookie | mail-term-session=... | 자동 | iron-session 세션 쿠키 (브라우저 자동 전송) |
+
+> 별도의 `Authorization` 헤더는 사용하지 않는다. iron-session은 암호화된 쿠키 기반이므로 브라우저가 자동으로 세션 쿠키를 전송한다.
+
+### 성공 응답 구조
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "처리 완료"
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| CFG-001 | 설정 읽기 | 앱 환경설정 값 조회 | ✅ |
-| CFG-002 | 설정 저장 | 앱 환경설정 값 저장 | ✅ |
-| CFG-003 | 설정 유효성 검증 | 설정 값의 범위/형식 검증 | ✅ |
+| success | boolean | ✅ | 항상 `true` |
+| data | object / array / null | ✅ | 응답 데이터 (데이터 없는 경우 `null`) |
+| message | string | ❌ | 사용자에게 표시할 메시지 (선택) |
 
-### Internal - Mail Service
+### 목록 조회 응답 구조 (페이지네이션)
 
-| 코드 | 이름 | 설명 | 상태 |
+```json
+{
+  "success": true,
+  "data": {
+    "items": [ ... ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 150,
+      "totalPages": 8
+    }
+  }
+}
+```
+
+### 에러 응답 구조
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "요청 파라미터가 올바르지 않습니다.",
+    "details": [ ... ]
+  }
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| MAIL-001 | 메일 수신 실행 | 메일함 폴링 및 신규 메일 수신 | ✅ |
-| MAIL-002 | 메일 파일 저장 | 수신된 메일을 분석 요청 파일로 저장 | ✅ |
-| MAIL-003 | 처리 이력 조회 | 처리 완료된 메일 Message ID 목록 조회 | ✅ |
+| success | boolean | ✅ | 항상 `false` |
+| error.code | string | ✅ | 에러 코드 (아래 에러 코드 체계 참조) |
+| error.message | string | ✅ | 사용자 친화적 에러 메시지 (POL-UI UI-R-019) |
+| error.details | array | ❌ | 유효성 검증 상세 (필드별 오류 목록) |
 
-### Internal - Analysis Service
+### 에러 코드 체계
 
-| 코드 | 이름 | 설명 | 상태 |
-|------|------|------|------|
-| ANAL-001 | 배치 분석 실행 | 분석 요청 폴더의 파일 일괄 분석 | ✅ |
-| ANAL-002 | 용어 추출 | 텍스트에서 업무 용어 추출 | ✅ |
-| ANAL-003 | 해설 생성 요청 | 추출된 용어에 대한 해설 생성 | ✅ |
+| HTTP 상태 코드 | 에러 코드 | 설명 | 관련 정책 |
+|---------------|-----------|------|-----------|
+| 400 | INVALID_REQUEST | 요청 파라미터 유효성 오류 | - |
+| 400 | VALIDATION_ERROR | 비즈니스 규칙 위반 (비밀번호 정책 등) | POL-AUTH AUTH-R-005, AUTH-R-006 |
+| 401 | UNAUTHORIZED | 인증 실패 또는 세션 만료 | POL-AUTH AUTH-R-011, AUTH-R-012 |
+| 403 | FORBIDDEN | 권한 없음 (역할 부족) | POL-AUTH AUTH-R-002, AUTH-R-014, AUTH-R-015 |
+| 404 | NOT_FOUND | 리소스를 찾을 수 없음 | - |
+| 409 | CONFLICT | 리소스 충돌 (중복 아이디 등) | POL-AUTH AUTH-R-004 |
+| 500 | INTERNAL_ERROR | 서버 내부 오류 | - |
+| 503 | SERVICE_UNAVAILABLE | 외부 서비스 연결 실패 (IMAP, Claude API) | POL-MAIL MAIL-R-003, POL-TERM TERM-R-007 |
 
-### Internal - Dictionary Service
+### 상태 코드 사용 규칙
 
-| 코드 | 이름 | 설명 | 상태 |
-|------|------|------|------|
-| DICT-001 | 용어 검색 | 키워드로 용어 사전 검색 | ✅ |
-| DICT-002 | 용어 상세 조회 | 용어 ID로 상세 정보 조회 | ✅ |
-| DICT-003 | 용어 등록/갱신 | 신규 용어 등록 또는 기존 용어 갱신 | ✅ |
-| DICT-004 | 인기 용어 조회 | 최근 빈도 높은 용어 목록 조회 | ✅ |
-| DICT-005 | 사전 통계 조회 | 총 용어 수, 마지막 업데이트 시각 등 | ✅ |
-| DICT-006 | 사전 백업 | 용어 사전 데이터 백업 생성 | ✅ |
+| 상태 코드 | 사용 상황 |
+|-----------|-----------|
+| 200 OK | 조회 성공, 수정 성공, 삭제 성공 |
+| 201 Created | 리소스 생성 성공 (사용자 등록) |
+| 400 Bad Request | 유효성 검증 실패 |
+| 401 Unauthorized | 미인증 또는 세션 만료 |
+| 403 Forbidden | 역할 기반 권한 부족 |
+| 404 Not Found | 리소스 없음 |
+| 409 Conflict | 고유 제약 위반 |
+| 500 Internal Server Error | 서버 내부 오류 |
+| 503 Service Unavailable | 외부 서비스 연결 실패 |
 
-## 문서 목록
+### 페이지네이션 표준
 
-| 파일명 | 그룹 | 설명 |
-|--------|------|------|
-| [api_graph.md](api_graph.md) | External - Graph API | Microsoft Graph API 호출 인터페이스 |
-| [api_claude.md](api_claude.md) | External - Claude API | Anthropic Claude API 호출 인터페이스 |
-| [api_config.md](api_config.md) | Internal - Config | 환경설정 서비스 인터페이스 |
-| [api_mail.md](api_mail.md) | Internal - Mail | 메일 수신 서비스 인터페이스 |
-| [api_analysis.md](api_analysis.md) | Internal - Analysis | 용어 분석 서비스 인터페이스 |
-| [api_dictionary.md](api_dictionary.md) | Internal - Dictionary | 용어 사전 서비스 인터페이스 |
+목록 조회 API에 적용되는 공통 Query Parameters:
+
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| page | number | ❌ | 1 | 페이지 번호 (1부터 시작) |
+| limit | number | ❌ | 20 | 페이지당 항목 수 (최대 100) |
+
+> 페이지네이션이 적용되는 API: ANAL-002 (분석 이력), DICT-001 (용어 검색)
+
+### 정렬 표준
+
+| 파라미터 | 타입 | 필수 | 기본값 | 설명 |
+|----------|------|------|--------|------|
+| sort | string | ❌ | API별 상이 | 정렬 기준 필드 |
+| order | string | ❌ | desc | 정렬 방향 (`asc` / `desc`) |
+
+### 공통 날짜/시간 형식
+- 모든 날짜/시간은 ISO 8601 형식으로 전송/반환한다. (예: `2026-03-15T09:30:00Z`)
+- 프론트엔드 표시 시 "YYYY-MM-DD HH:mm" 형식으로 변환한다 (POL-UI UI-R-015).

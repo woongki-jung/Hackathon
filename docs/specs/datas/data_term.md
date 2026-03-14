@@ -1,166 +1,147 @@
 # Term 데이터 정의
 
 ## 개요
-
-용어 사전의 핵심 엔티티이다. 메일에서 추출된 EMR/비즈니스/약어 용어와 Claude API로 생성된 해설을 저장한다. 용어사전 뷰어(POL-UI UI-04~06)에서 검색 및 조회 대상이 되는 주요 데이터이다.
+- 메일 분석을 통해 추출된 업무 용어와 해설을 저장한다.
+- DB에 메타정보를 저장하고, 동시에 `GLOSSARY_STORAGE_PATH`에 `<용어>.md` 파일로도 저장한다 (이중 저장).
+- 용어사전 뷰어의 검색 및 빈도 표시에 활용한다.
+- 관련 도메인: 용어 (POL-TERM, POL-DATA)
 
 ---
 
-## DATA-003 Term
+## DATA-004 Term
 
 ### 엔티티 정보
-
 | 항목 | 내용 |
 |------|------|
 | 엔티티명 (논리) | Term |
 | 테이블명 (물리) | terms |
-| 설명 | 용어 사전 항목 (용어, 분류, 해설, 발견 통계) |
-| 데이터베이스 | SQLite 3 |
+| 설명 | 추출된 업무 용어 및 해설 |
+| 데이터베이스 | SQLite (better-sqlite3 + Drizzle ORM) |
 | 파티셔닝 | 없음 |
 
 ### 필드 정의
 
 | 필드명 | 컬럼명 | 타입 | 길이 | NOT NULL | 기본값 | 설명 | 개인정보 |
 |--------|--------|------|------|----------|--------|------|---------|
-| id | id | INTEGER | - | ✅ | AUTOINCREMENT | 기본 키 | |
-| term | term | TEXT | 200 | ✅ | - | 용어 원문 (고유) | |
-| category | category | TEXT | 20 | ✅ | - | 분류 (EMR / Business / Abbreviation) | |
-| summary | summary | TEXT | 100 | - | NULL | 1줄 요약 (50자 이내) | |
-| description | description | TEXT | - | - | NULL | 상세 설명 (200자 이내) | |
-| relatedTerms | related_terms | TEXT | - | - | NULL | 관련 용어 (JSON 배열 문자열) | |
-| sourceCount | source_count | INTEGER | - | ✅ | 1 | 발견 횟수 | |
-| firstSeenAt | first_seen_at | TEXT | - | ✅ | datetime('now') | 최초 발견 일시 | |
-| lastSeenAt | last_seen_at | TEXT | - | ✅ | datetime('now') | 최근 발견 일시 | |
-| isDescriptionComplete | is_description_complete | INTEGER | - | ✅ | 0 | 해설 완료 여부 (0: 미완료, 1: 완료) | |
-| createdAt | created_at | TEXT | - | ✅ | datetime('now') | 생성일시 | |
-| updatedAt | updated_at | TEXT | - | ✅ | datetime('now') | 수정일시 | |
-| deletedAt | deleted_at | TEXT | - | - | NULL | 삭제일시 (소프트 삭제) | |
-
-### category 필드 값 정의
-
-| 값 | 설명 | 관련 정책 |
-|----|------|-----------|
-| EMR | EMR(전자의무기록) 시스템 관련 용어 | POL-TERM TERM-01 |
-| Business | 의료/병원 업무 도메인 용어 | POL-TERM TERM-01 |
-| Abbreviation | 업무에서 사용되는 약어/축약어 | POL-TERM TERM-01 |
-
-### relatedTerms 필드 형식
-
-JSON 배열 문자열로 저장한다. 예시:
-
-```json
-["OCS", "PACS", "EMR"]
-```
+| id | id | TEXT | 36 | YES | - | 기본 키 (UUID) | |
+| name | name | TEXT | 200 | YES | - | 용어명 (유니크) | |
+| category | category | TEXT | 50 | NO | `NULL` | 분류 (`emr` / `business` / `abbreviation` / `general`) | |
+| description | description | TEXT | - | YES | - | 용어 해설 (제한 없음) | |
+| filePath | file_path | TEXT | 500 | NO | `NULL` | 용어 해설집 파일 상대경로 (`./data/terms/<용어>.md`) | |
+| frequency | frequency | INTEGER | - | YES | `1` | 발견 빈도 (메일에서 추출될 때마다 증가) | |
+| lastSourceMailSubject | last_source_mail_subject | TEXT | 500 | NO | `NULL` | 마지막 출처 메일 제목 | |
+| lastSourceMailDate | last_source_mail_date | TEXT | - | NO | `NULL` | 마지막 출처 메일 수신일 | |
+| createdAt | created_at | TEXT | - | YES | `datetime('now')` | 최초 추출 일시 | |
+| updatedAt | updated_at | TEXT | - | YES | `datetime('now')` | 마지막 갱신 일시 | |
 
 ### 인덱스 정의
 
 | 인덱스명 | 대상 컬럼 | 타입 | 유니크 | 설명 |
 |----------|-----------|------|--------|------|
-| uq_terms_term | term | BTREE | ✅ | 용어 원문 고유 제약 |
-| idx_terms_category | category | BTREE | - | 카테고리별 필터링 |
-| idx_terms_source_count | source_count | BTREE | - | 빈도순 정렬 |
-| idx_terms_last_seen_at | last_seen_at | BTREE | - | 최근 발견 기준 정렬 |
-| idx_terms_deleted_at | deleted_at | BTREE | - | 소프트 삭제 필터링 |
-| idx_terms_search | term, description | - | - | 검색 성능 (FTS5 가상 테이블 권장) |
+| idx_terms_name | name | BTREE | YES | 용어명 중복 방지 및 정확 검색 |
+| idx_terms_category | category | BTREE | NO | 분류별 필터 |
+| idx_terms_frequency | frequency | BTREE | NO | 빈도순 정렬 (상위 용어 조회) |
+| idx_terms_updated_at | updated_at | BTREE | NO | 최신 갱신순 정렬 |
+
+### FTS5 전문 검색 테이블
+
+용어 검색 성능을 위해 SQLite FTS5 가상 테이블을 사용한다.
+
+```sql
+CREATE VIRTUAL TABLE terms_fts USING fts5(
+    name,
+    description,
+    content='terms',
+    content_rowid='rowid'
+);
+```
+
+> FTS5 테이블은 `terms` 테이블과 동기화하여 유지한다. INSERT/UPDATE/DELETE 시 트리거 또는 애플리케이션 레벨에서 동기화한다.
 
 ### 관계 정의
 
 | 관계 | 대상 엔티티 | 종류 | 외래 키 | 설명 |
 |------|------------|------|---------|------|
-| sourceFiles | TermSourceFile | 1:N | term_source_files.term_id | 용어 출처 파일 목록 (최대 10건) |
+| sourceFiles | TermSourceFile | 1:N | term_source_files.term_id | 용어가 추출된 출처 메일 파일 목록 |
 
 ### DDL
 
 ```sql
-CREATE TABLE IF NOT EXISTS terms (
-    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
-    term                     TEXT    NOT NULL UNIQUE,
-    category                 TEXT    NOT NULL
-                                     CHECK (category IN ('EMR', 'Business', 'Abbreviation')),
-    summary                  TEXT,
-    description              TEXT,
-    related_terms            TEXT,
-    source_count             INTEGER NOT NULL DEFAULT 1,
-    first_seen_at            TEXT    NOT NULL DEFAULT (datetime('now')),
-    last_seen_at             TEXT    NOT NULL DEFAULT (datetime('now')),
-    is_description_complete  INTEGER NOT NULL DEFAULT 0
-                                     CHECK (is_description_complete IN (0, 1)),
-    created_at               TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at               TEXT    NOT NULL DEFAULT (datetime('now')),
-    deleted_at               TEXT
+CREATE TABLE terms (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    category TEXT CHECK (category IN ('emr', 'business', 'abbreviation', 'general')),
+    description TEXT NOT NULL,
+    file_path TEXT,
+    frequency INTEGER NOT NULL DEFAULT 1,
+    last_source_mail_subject TEXT,
+    last_source_mail_date TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_terms_term
-    ON terms(term) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX idx_terms_name ON terms(name);
+CREATE INDEX idx_terms_category ON terms(category);
+CREATE INDEX idx_terms_frequency ON terms(frequency);
+CREATE INDEX idx_terms_updated_at ON terms(updated_at);
 
-CREATE INDEX IF NOT EXISTS idx_terms_category
-    ON terms(category);
-
-CREATE INDEX IF NOT EXISTS idx_terms_source_count
-    ON terms(source_count);
-
-CREATE INDEX IF NOT EXISTS idx_terms_last_seen_at
-    ON terms(last_seen_at);
-
-CREATE INDEX IF NOT EXISTS idx_terms_deleted_at
-    ON terms(deleted_at);
-```
-
-### FTS(전문 검색) 지원
-
-검색 성능 향상을 위해 SQLite FTS5 가상 테이블을 활용한다 (POL-UI UI-05: 부분 일치, 실시간 검색).
-
-```sql
-CREATE VIRTUAL TABLE IF NOT EXISTS terms_fts USING fts5(
-    term,
-    summary,
+-- FTS5 전문 검색 테이블
+CREATE VIRTUAL TABLE terms_fts USING fts5(
+    name,
     description,
     content='terms',
-    content_rowid='id'
+    content_rowid='rowid'
 );
 
--- terms 테이블 변경 시 FTS 인덱스 동기화 트리거
-CREATE TRIGGER IF NOT EXISTS trg_terms_ai AFTER INSERT ON terms BEGIN
-    INSERT INTO terms_fts(rowid, term, summary, description)
-    VALUES (new.id, new.term, new.summary, new.description);
+-- FTS5 동기화 트리거
+CREATE TRIGGER terms_ai AFTER INSERT ON terms BEGIN
+    INSERT INTO terms_fts(rowid, name, description) VALUES (new.rowid, new.name, new.description);
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_terms_au AFTER UPDATE ON terms BEGIN
-    INSERT INTO terms_fts(terms_fts, rowid, term, summary, description)
-    VALUES ('delete', old.id, old.term, old.summary, old.description);
-    INSERT INTO terms_fts(rowid, term, summary, description)
-    VALUES (new.id, new.term, new.summary, new.description);
+CREATE TRIGGER terms_ad AFTER DELETE ON terms BEGIN
+    INSERT INTO terms_fts(terms_fts, rowid, name, description) VALUES ('delete', old.rowid, old.name, old.description);
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_terms_ad AFTER DELETE ON terms BEGIN
-    INSERT INTO terms_fts(terms_fts, rowid, term, summary, description)
-    VALUES ('delete', old.id, old.term, old.summary, old.description);
+CREATE TRIGGER terms_au AFTER UPDATE ON terms BEGIN
+    INSERT INTO terms_fts(terms_fts, rowid, name, description) VALUES ('delete', old.rowid, old.name, old.description);
+    INSERT INTO terms_fts(rowid, name, description) VALUES (new.rowid, new.name, new.description);
 END;
 ```
 
+### Drizzle ORM 스키마 예시
+
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+export const terms = sqliteTable('terms', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  category: text('category', { enum: ['emr', 'business', 'abbreviation', 'general'] }),
+  description: text('description').notNull(),
+  filePath: text('file_path'),
+  frequency: integer('frequency').notNull().default(1),
+  lastSourceMailSubject: text('last_source_mail_subject'),
+  lastSourceMailDate: text('last_source_mail_date'),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+```
+
+> FTS5 가상 테이블은 Drizzle ORM에서 직접 정의할 수 없으므로, 별도 raw SQL 마이그레이션으로 생성한다.
+
 ### 비즈니스 규칙
-
-- 용어 원문(`term`)은 대소문자를 구분하여 저장하되, 중복 판단 시에는 대소문자를 무시한다 (COLLATE NOCASE 적용 고려).
-- 이미 존재하는 용어가 재발견된 경우 (POL-TERM TERM-04):
-  - `source_count`를 1 증가
-  - `last_seen_at`을 현재 시각으로 갱신
-  - 해설 내용(`summary`, `description`)은 변경하지 않음
-- 해설 미완료 상태(`is_description_complete = 0`)인 용어는 다음 배치에서 Claude API 호출 대상이 된다 (POL-TERM TERM-06).
-- 소프트 삭제된 용어(`deleted_at IS NOT NULL`)는 뷰어에서 표시하지 않는다.
-- 10,000건 초과 시 성능 모니터링을 권장한다 (POL-TERM).
-
-### 데이터 생명주기
-
-| 단계 | 조건 | 처리 |
-|------|------|------|
-| 생성 | 메일에서 신규 용어 추출 시 | INSERT (is_description_complete = 0) |
-| 해설 완료 | Claude API 응답 수신 시 | UPDATE summary, description, related_terms, is_description_complete = 1 |
-| 재발견 | 기존 용어가 다른 메일에서 재발견 시 | UPDATE source_count, last_seen_at |
-| 삭제 | 사용자 수동 삭제 시 | UPDATE deleted_at (소프트 삭제) |
+- **이중 저장**: DB 메타정보 저장과 동시에 `<용어>.md` 파일도 생성/갱신 (POL-TERM TERM-R-016).
+- **영구 보존**: 용어 데이터는 삭제하지 않는다 (POL-DATA DATA-R-017).
+- **빈도 증가**: 동일 용어가 다른 메일에서 재추출되면 `frequency`를 1 증가시킨다.
+- **해설 갱신 조건**: 새 해설의 문자 수가 기존 대비 20% 이상 증가했거나, 새 출처 메일 정보가 추가된 경우 갱신 (POL-TERM TERM-R-018).
+- **1건당 최대 30개**: 단일 메일에서 추출하는 용어 수는 최대 30개 (POL-TERM TERM-R-015).
+- **분류 기준**: EMR 시스템 용어, 비즈니스 용어, 약어로 분류 (POL-TERM TERM-R-013).
+- **파일명 치환**: 파일명에 사용 불가 문자는 언더스코어로 치환 (POL-DATA DATA-R-012).
+- **해설집 파일 형식**: 마크다운, 용어명(제목) + 해설(본문) + 메타정보(갱신 일시, 출처) 포함 (POL-TERM TERM-R-017, TERM-R-019).
+- **검색**: FTS5를 활용한 전문 검색, 300ms 디바운스 적용 (POL-UI UI-R-012).
+- **빈도 상위 표시**: 빈도 내림차순 상위 10개를 용어사전 뷰어에 표시 (POL-UI UI-R-017).
 
 ### 마이그레이션 고려사항
-
-- 앱 최초 실행 시 테이블, FTS 가상 테이블, 트리거를 자동 생성한다.
-- seed 데이터 불필요 (운영 중 자동 적재).
-- `related_terms`는 JSON 배열 문자열로 저장하므로, 향후 별도 관계 테이블로 정규화할 수 있다.
-- 카테고리 추가 시 CHECK 제약을 수정해야 한다.
+- **FTS5 테이블**: Drizzle ORM 마이그레이션 외에 별도 raw SQL로 FTS5 테이블과 트리거를 생성해야 한다.
+- **기존 데이터 FTS 인덱싱**: FTS5 테이블 생성 후 기존 `terms` 데이터를 FTS에 수동 삽입하는 마이그레이션 스크립트 필요.
+- **파일 시스템 동기**: DB의 `file_path`와 실제 파일 경로 불일치 시 복구 로직 필요.

@@ -1,71 +1,107 @@
 # 메일 상태 갱신 기능 정의
 
 ## 개요
-
-- **기능 목적**: 처리 완료된 메일을 "읽음" 상태로 변경하고, 처리 이력을 로컬에 기록한다.
-- **적용 범위**: 메일 내용 저장이 성공적으로 완료된 후 호출된다.
+- IMAP 서버에서 처리 완료된 메일의 SEEN 플래그 설정, 분석 대기열 등록, 처리 로그 기록 기능을 정의한다.
+- 적용 범위: 메일 텍스트 저장 성공 후 후처리
 
 ---
 
-## MAIL-PROC-002: 메일 상태 갱신
+## MAIL-PROC-002 메일 상태 갱신
 
 ### 기본 정보
-
 | 항목 | 내용 |
 |------|------|
 | 기능명 | 메일 상태 갱신 |
 | 분류 | 도메인 특화 로직 |
-| 레이어 | Infrastructure |
-| 트리거 | DATA-FILE-001에서 메일 파일 저장 성공 후 |
-| 관련 정책 | POL-MAIL (MAIL-03, MAIL-04) |
+| 레이어 | lib/mail |
+| 트리거 | DATA-FILE-001로 메일 임시 파일 저장 성공 후 |
+| 관련 정책 | POL-MAIL (MAIL-R-008, MAIL-R-014, MAIL-R-015), POL-DATA (DATA-R-016) |
 
 ### 입력 / 출력
 
-#### 입력 (Input)
+#### 1. SEEN 플래그 설정 (markAsSeen)
 
+##### 입력 (Input)
 | 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
 |----------|------|------|------|-------------|
-| messageId | string | ✅ | 메일 Message ID | 비어 있지 않은 문자열 |
-| userEmail | string | ✅ | 대상 메일 계정 | 이메일 형식 |
+| imapClient | ImapFlow | ✅ | 활성 IMAP 연결 | - |
+| uid | number | ✅ | 메일 UID | - |
 
-#### 출력 (Output)
-
+##### 출력 (Output)
 | 항목 | 타입 | 설명 |
 |------|------|------|
-| statusUpdated | boolean | 읽음 상태 변경 성공 여부 |
-| historyRecorded | boolean | 처리 이력 기록 성공 여부 |
+| success | boolean | 플래그 설정 성공 여부 |
 
-#### 예외 / 오류
-
+##### 예외 / 오류
 | 조건 | 오류 코드 | 설명 |
 |------|-----------|------|
-| 상태 변경 실패 | ERR_MAIL_STATUS_UPDATE_FAILED | Graph API PATCH 요청 실패 |
-| 이력 기록 실패 | ERR_MAIL_HISTORY_WRITE_FAILED | 로컬 이력 파일 쓰기 실패 |
+| 플래그 설정 실패 | ERR_IMAP_FLAG | 경고 로그 기록, 다음 주기에 재처리 가능 (MAIL-R-008) |
+
+#### 2. 분석 대기열 등록 (enqueueForAnalysis)
+
+##### 입력 (Input)
+| 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
+|----------|------|------|------|-------------|
+| fileName | string | ✅ | 저장된 메일 파일명 | {timestamp}_{hash}.txt 형식 |
+| mailSubject | string | ❌ | 메일 제목 | - |
+| mailReceivedAt | string | ❌ | 메일 수신일시 | ISO 8601 |
+
+##### 출력 (Output)
+| 항목 | 타입 | 설명 |
+|------|------|------|
+| queueId | string | 분석 대기열 레코드 ID |
+
+#### 3. 처리 로그 기록 (logProcessingResult)
+
+##### 입력 (Input)
+| 파라미터 | 타입 | 필수 | 설명 | 유효성 규칙 |
+|----------|------|------|------|-------------|
+| processType | string | ✅ | 프로세스 유형 | "mail_receive" 또는 "term_analysis" |
+| status | string | ✅ | 실행 결과 | "success" / "failure" / "skipped" |
+| mailCount | number | ❌ | 처리 건수 | 기본값 0 |
+| analyzedCount | number | ❌ | 분석 건수 | 기본값 0 |
+| errorMessage | string | ❌ | 오류 메시지 | 최대 1000자 |
+
+##### 출력 (Output)
+| 항목 | 타입 | 설명 |
+|------|------|------|
+| logId | string | 처리 로그 레코드 ID |
 
 ### 처리 흐름
 
-1. **읽음 상태 변경**: Graph API PATCH `/messages/{id}`로 `isRead: true`를 설정한다 (MAIL-04).
-   - 실패 시 로그에 기록하되, 중복 처리 가능성을 감안한다 (MAIL-04).
-   - 메일을 삭제하거나 이동하지 않는다 (원본 보존 원칙, MAIL-04).
-2. **처리 이력 기록**: 처리 완료된 Message ID를 로컬 파일에 기록한다 (MAIL-03 중복 방지).
-3. **결과 반환**: 각 단계의 성공 여부를 반환한다.
+```mermaid
+flowchart TD
+    A[메일 파일 저장 완료] --> B[IMAP SEEN 플래그 설정]
+    B --> C{성공?}
+    C -- 아니오 --> D[경고 로그<br/>다음 주기 재처리 가능]
+    C -- 예 --> E[분석 대기열에 등록<br/>status=pending]
+    D --> E
+    E --> F[처리 로그 기록]
+```
 
 ### 구현 가이드
 
-- **패턴**: 상태 변경(API 호출)과 이력 기록(로컬 파일)을 분리하여, 하나가 실패해도 다른 하나는 수행한다.
-- **동시성**: 이력 파일 쓰기 시 파일 잠금을 고려한다.
-- **외부 의존성**: Microsoft Graph API (`PATCH /messages/{id}`)
+- **패턴**: Service 함수 - lib/mail/mail-status-service.ts
+- **SEEN 플래그**: imapflow의 `client.messageFlagsAdd(uid, ['\\Seen'])` 사용
+- **분석 대기열**: analysis_queue 테이블에 INSERT (DATA-007)
+- **처리 로그**: mail_processing_logs 테이블에 INSERT (DATA-003)
+- **트랜잭션**: 대기열 등록과 로그 기록은 DB 트랜잭션으로 묶기 권장
+- **외부 의존성**: imapflow, Drizzle ORM
 
 ### 관련 기능
+- **이 기능을 호출하는 기능**: TERM-BATCH-001
+- **이 기능이 호출하는 기능**: CMN-LOG-001
 
-- **이 기능을 호출하는 기능**: MAIL-RECV-001 (메일 수신 후)
-- **이 기능이 호출하는 기능**: CMN-AUTH-001, CMN-HTTP-001, CMN-LOG-001
+### 관련 데이터
+- DATA-003 MailProcessingLog (mail_processing_logs 테이블)
+- DATA-007 AnalysisQueue (analysis_queue 테이블)
 
 ### 테스트 시나리오
 
 | 시나리오 | 입력 조건 | 기대 결과 |
 |----------|-----------|-----------|
-| 정상 처리 | 유효한 messageId | 읽음 상태 변경 성공, 이력 기록 성공 |
-| API 실패 | PATCH 요청 500 오류 | statusUpdated=false, 이력 기록은 수행 |
-| 이력 기록 실패 | 파일 쓰기 권한 없음 | 상태 변경은 수행, historyRecorded=false |
-| 중복 방지 확인 | 이미 기록된 messageId | 이력에서 중복 확인 가능 |
+| SEEN 플래그 정상 설정 | 유효한 IMAP 연결, uid | success=true |
+| SEEN 플래그 실패 | IMAP 연결 끊김 | success=false, 경고 로그 |
+| 대기열 등록 | 새 파일명 | pending 상태로 등록 |
+| 중복 대기열 등록 | 이미 등록된 파일명 | 기존 레코드 유지 (UNIQUE 제약) |
+| 처리 로그 기록 | 수신 5건 성공 | mail_receive, success, mailCount=5 |
