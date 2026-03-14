@@ -36,7 +36,7 @@
 | 인증 | iron-session + bcrypt | HTTP-only 암호화 쿠키, 서버리스 환경 호환 |
 | 스타일 | Tailwind CSS | 유틸리티 퍼스트, 반응형 디자인 생산성 |
 | 메일 수신 | imapflow | IMAP 프로토콜 지원, SSL/TLS, 비동기 처리 |
-| AI 분석 | @anthropic-ai/sdk | Claude API 공식 SDK |
+| AI 분석 | @google/generative-ai | Gemini API 공식 SDK |
 | 스케줄러 | node-cron | 경량 cron 스케줄링, Next.js 프로세스 내 실행 |
 | 검색 | SQLite FTS5 | 전문 검색, 추가 서비스 불필요 |
 
@@ -89,7 +89,7 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
 - ✅ **T1-2: 핵심 패키지 설치 및 설정** [복잡도: 소]
   - better-sqlite3, drizzle-orm, drizzle-kit 설치
   - iron-session, bcrypt 설치
-  - imapflow, @anthropic-ai/sdk, node-cron 설치
+  - imapflow, @google/generative-ai, node-cron 설치
   - tsconfig.json 경로 별칭 설정 (`@/*` → `./src/*`)
 
 - ✅ **T1-3: Drizzle ORM 스키마 정의 (전체)** [복잡도: 중]
@@ -324,7 +324,7 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
 
 #### 기술 고려사항
 - GNB는 Server Component에서 세션 정보를 가져와 역할별 메뉴 분기
-- 환경설정 조회 시 `process.env`에서 MAIL_PASSWORD, ANTHROPIC_API_KEY 존재 여부만 확인
+- 환경설정 조회 시 `process.env`에서 MAIL_PASSWORD, GEMINI_API_KEY 존재 여부만 확인
 - 연결 테스트는 imapflow로 실제 IMAP 서버에 접속 시도
 
 ---
@@ -499,8 +499,8 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
   - 정규식 기반 패턴 매칭
 
 - ⬜ **T6-2: Claude API 호출 래퍼** [복잡도: 중]
-  - `lib/analysis/claude-client.ts` 생성
-  - @anthropic-ai/sdk 래퍼 (API 키 환경변수 조회, 모델명 설정 조회)
+  - `lib/analysis/gemini-client.ts` 생성
+  - @google/generative-ai 래퍼 (API 키 환경변수 조회, 모델명 설정 조회)
   - HTTP 재시도 적용 (CMN-HTTP-001)
   - API 키 미설정 시 SERVICE_UNAVAILABLE 에러
 

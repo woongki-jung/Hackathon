@@ -1,7 +1,7 @@
 # 해설 생성 기능 정의
 
 ## 개요
-- Claude API를 사용하여 추출된 용어별 한국어 해설과 메일 요약/후속 작업 제안을 생성하는 기능을 정의한다.
+- @google/generative-ai API를 사용하여 추출된 용어별 한국어 해설과 메일 요약/후속 작업 제안을 생성하는 기능을 정의한다.
 - 적용 범위: 메일 분석 파이프라인의 해설 생성 및 메일 요약 단계
 
 ---
@@ -73,12 +73,12 @@ flowchart TD
     G --> H[요약 + 해설 반환]
 ```
 
-### Claude API 호출 설정
+### @google/generative-ai API 호출 설정
 
 | 항목 | 값 | 관련 정책 |
 |------|-----|-----------|
-| SDK | @anthropic-ai/sdk | TERM-R-004 |
-| 모델 | ANTHROPIC_MODEL 환경변수 (기본 claude-sonnet-4-6) | TERM-R-005 |
+| SDK | @google/generative-ai | TERM-R-004 |
+| 모델 | GEMINI_MODEL 환경변수 (기본 gemini-2.0-flash) | TERM-R-005 |
 | 재시도 | 최대 2회, 5초 간격 | TERM-R-007 |
 | 타임아웃 | 60초 | TERM-R-008 |
 | 입력 제한 | 10,000자 | TERM-R-009 |
@@ -105,7 +105,7 @@ flowchart TD
 - **API 호출 최적화**: 요약과 용어 해설을 가능하면 단일 API 호출로 처리
 - **재시도**: CMN-HTTP-001 활용
 - **프롬프트 분리**: 별도 파일로 관리하여 유지보수성 확보
-- **외부 의존성**: @anthropic-ai/sdk, CMN-HTTP-001
+- **외부 의존성**: @google/generative-ai, CMN-HTTP-001
 
 ### 관련 기능
 - **이 기능을 호출하는 기능**: TERM-BATCH-001
@@ -117,7 +117,7 @@ flowchart TD
 |----------|-----------|-----------|
 | 정상 요약 생성 | 1000자 메일 | 요약 (500자 이내) + 후속 작업 (5개 이내) |
 | 정상 해설 생성 | 10개 용어 | 10개 용어별 한국어 해설 |
-| API 키 미설정 | ANTHROPIC_API_KEY 없음 | ERR_API_KEY_MISSING, 건너뜀 |
+| API 키 미설정 | GEMINI_API_KEY 없음 | ERR_API_KEY_MISSING, 건너뜀 |
 | API 실패 후 재시도 | 1회 실패, 2회 성공 | 정상 생성 |
 | 타임아웃 | 60초 초과 | ERR_API_TIMEOUT 후 재시도 |
 | 본문 100자 미만 | 50자 메일 | 요약만 생성, 용어 분석 건너뜀 |

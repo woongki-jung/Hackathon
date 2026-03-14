@@ -1,77 +1,76 @@
-# Claude API 외부 연동 인터페이스 정의
+# Gemini API 외부 연동 인터페이스 정의
 
 ## 개요
-- Anthropic Claude API를 호출하여 메일 분석, 용어 추출, 해설 생성을 수행하는 외부 연동 인터페이스를 정의한다.
+- Google Gemini API를 호출하여 메일 분석, 용어 추출, 해설 생성을 수행하는 외부 연동 인터페이스를 정의한다.
 - 이 인터페이스는 REST API 엔드포인트가 아닌, 서버 사이드에서만 사용하는 외부 API 호출 규격이다.
-- 관련 라이브러리: @anthropic-ai/sdk
+- 관련 라이브러리: @google/generative-ai
 - 관련 기능: TERM-EXT-001 (용어 추출), TERM-CLS-001 (용어 분류), TERM-GEN-001 (해설 생성)
 - 관련 정책: POL-TERM (TERM-R-004 ~ TERM-R-009), POL-AUTH (AUTH-R-018)
 
 ---
 
-## CLAUDE-001 Claude API 호출
+## GEMINI-001 Gemini API 호출
 
 ### 기본 정보
 | 항목 | 내용 |
 |------|------|
 | 유형 | 외부 API 호출 (서버 사이드 전용) |
-| 대상 서비스 | Anthropic Claude Messages API |
-| SDK | @anthropic-ai/sdk |
-| 인증 | ANTHROPIC_API_KEY 환경변수 (AUTH-R-018) |
-| 모델 | 환경변수 ANTHROPIC_MODEL (기본값: claude-sonnet-4-6) (TERM-R-005) |
+| 대상 서비스 | Google Gemini API |
+| SDK | @google/generative-ai |
+| 인증 | GEMINI_API_KEY 환경변수 (AUTH-R-018) |
+| 모델 | 환경변수 GEMINI_MODEL (기본값: gemini-2.0-flash) (TERM-R-005) |
 
 ### SDK 초기화
 
 ```typescript
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const model = genAI.getGenerativeModel({
+  model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
 });
 ```
 
-> API 키가 미설정(`ANTHROPIC_API_KEY` 환경변수 없음)이면 분석 프로세스를 건너뛴다 (TERM-R-006).
+> API 키가 미설정(`GEMINI_API_KEY` 환경변수 없음)이면 분석 프로세스를 건너뛴다 (TERM-R-006).
 
 ### 호출 규격
 
-#### Messages API 호출
+#### generateContent API 호출
 ```typescript
-const response = await client.messages.create({
-  model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
-  max_tokens: 4096,
-  system: "<시스템 프롬프트>",
-  messages: [
+const result = await model.generateContent({
+  contents: [
     {
       role: "user",
-      content: "<메일 본문 텍스트 (최대 10,000자)>"
-    }
-  ]
+      parts: [{ text: `${systemPrompt}\n\n${mailText}` }],
+    },
+  ],
+  generationConfig: {
+    maxOutputTokens: 4096,
+    responseMimeType: "application/json",
+  },
 });
+
+const text = result.response.text();
 ```
 
 #### 요청 파라미터
 | 파라미터 | 타입 | 값 | 설명 | 관련 정책 |
 |----------|------|----|------|-----------|
-| model | string | 환경변수 ANTHROPIC_MODEL | 사용 모델 | TERM-R-005 |
-| max_tokens | number | 4096 | 최대 응답 토큰 수 | - |
-| system | string | 분석 목적별 시스템 프롬프트 | 시스템 프롬프트 | - |
-| messages[0].content | string | 메일 본문 (최대 10,000자) | 분석 대상 텍스트 | TERM-R-009 |
+| model | string | 환경변수 GEMINI_MODEL | 사용 모델 | TERM-R-005 |
+| maxOutputTokens | number | 4096 | 최대 응답 토큰 수 | - |
+| responseMimeType | string | "application/json" | JSON 응답 강제 | - |
+| contents[0].parts[0].text | string | 시스템 프롬프트 + 메일 본문 (최대 10,000자) | 분석 대상 텍스트 | TERM-R-009 |
 
 #### 응답 구조 (SDK 반환값)
 ```typescript
-interface MessageResponse {
-  id: string;
-  type: "message";
-  role: "assistant";
-  content: Array<{
-    type: "text";
-    text: string;  // JSON 문자열로 구조화된 응답
-  }>;
-  model: string;
-  stop_reason: "end_turn" | "max_tokens" | "stop_sequence";
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
+interface GenerateContentResult {
+  response: {
+    text(): string;  // JSON 문자열로 구조화된 응답
+    usageMetadata?: {
+      promptTokenCount: number;
+      candidatesTokenCount: number;
+      totalTokenCount: number;
+    };
   };
 }
 ```
@@ -80,7 +79,7 @@ interface MessageResponse {
 
 #### 1. 메일 요약 및 후속 작업 생성
 
-**시스템 프롬프트 목적**: 메일 본문의 핵심 내용을 요약하고 후속 작업을 제안한다.
+**프롬프트 목적**: 메일 본문의 핵심 내용을 요약하고 후속 작업을 제안한다.
 
 **기대 응답 JSON 구조**:
 ```json
@@ -100,7 +99,7 @@ interface MessageResponse {
 
 #### 2. 용어 추출 및 분류
 
-**시스템 프롬프트 목적**: 메일 본문에서 EMR/비즈니스/약어 용어를 추출하고 분류한다.
+**프롬프트 목적**: 메일 본문에서 EMR/비즈니스/약어 용어를 추출하고 분류한다.
 
 **기대 응답 JSON 구조**:
 ```json
@@ -149,7 +148,7 @@ interface MessageResponse {
 - 메일 본문은 최대 10,000자로 제한하여 전송한다 (TERM-R-009).
 - 메일 본문이 100자 미만인 경우 용어 분석을 건너뛰고 요약만 저장한다 (POL-TERM 예외 사항).
 - 해설은 한국어로 생성한다. 영문 메일도 한국어 해설을 생성한다 (POL-TERM 예외 사항).
-- 시스템 프롬프트는 별도 파일로 관리하여 유지보수성을 확보한다 (POL-TERM 구현 가이드).
+- 프롬프트는 별도 파일로 관리하여 유지보수성을 확보한다 (POL-TERM 구현 가이드).
 - 분석은 순차 처리를 기본으로 한다 (POL-TERM 구현 가이드).
 
 ### 관련 기능

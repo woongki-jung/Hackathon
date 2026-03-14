@@ -29,23 +29,23 @@
 
 | 코드 | 정책명 | 분류 | 설명 | 상태 |
 |------|--------|------|------|------|
-| POL-AUTH | 인증/보안 정책 | 인증/인가, 보안 | 웹 로그인, 세션 관리, IMAP 인증 정보 보호, Claude API 키 관리 | ✅ |
+| POL-AUTH | 인증/보안 정책 | 인증/인가, 보안 | 웹 로그인, 세션 관리, IMAP 인증 정보 보호, Gemini API 키 관리 | ✅ |
 | POL-MAIL | 메일 수신 정책 | 비즈니스 규칙 | IMAP 프로토콜 기반 메일 수신, SSL/TLS 통신, 주기적 확인 규칙 | ✅ |
 | POL-DATA | 데이터 저장 정책 | 데이터 | SQLite DB 관리, 파일 시스템 저장, 보존/삭제 규칙 | ✅ |
-| POL-TERM | 용어 분석 정책 | 비즈니스 규칙 | Claude API 기반 용어 추출/해설 생성, 용어.md 파일 관리 | ✅ |
+| POL-TERM | 용어 분석 정책 | 비즈니스 규칙 | Gemini API 기반 용어 추출/해설 생성, 용어.md 파일 관리 | ✅ |
 | POL-UI | UI/UX 정책 | 운영 | 반응형 웹 지원, 브라우저 호환성, 접근성 기준 | ✅ |
 
 ## 정책 분류 체계
 
 ### 인증/인가 및 보안 정책
-- **POL-AUTH**: 관리자/일반 사용자 로그인, iron-session 쿠키 세션, bcrypt 비밀번호 해싱, IMAP 계정 정보 보호, Claude API 키 관리
+- **POL-AUTH**: 관리자/일반 사용자 로그인, iron-session 쿠키 세션, bcrypt 비밀번호 해싱, IMAP 계정 정보 보호, Gemini API 키 관리
 
 ### 데이터 정책
 - **POL-DATA**: SQLite(better-sqlite3 + Drizzle ORM) 데이터 관리, `./data/` 경로 기반 파일 저장, 메일 임시 파일 보존/삭제, 용어 해설집 파일 관리
 
 ### 비즈니스 규칙
 - **POL-MAIL**: IMAP 프로토콜(imapflow) 기반 메일 수신, SSL/TLS 필수, node-cron 기반 주기적 실행
-- **POL-TERM**: Claude API(@anthropic-ai/sdk) 기반 용어 분석, 메일 요약 및 후속 작업 제안, 용어 해설집 생성/갱신
+- **POL-TERM**: Gemini API(@google/generative-ai) 기반 용어 분석, 메일 요약 및 후속 작업 제안, 용어 해설집 생성/갱신
 
 ### 운영 정책
 - **POL-UI**: ES2016/CSS3 호환 브라우저 지원, Tailwind CSS 기반 반응형 디자인, 검색 UX 규칙

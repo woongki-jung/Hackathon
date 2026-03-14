@@ -1,7 +1,7 @@
 # 용어 추출 기능 정의
 
 ## 개요
-- Claude API를 사용하여 메일 본문에서 EMR 시스템 관련 용어, 비즈니스 용어, 약어를 추출하는 기능을 정의한다.
+- Gemini API를 사용하여 메일 본문에서 EMR 시스템 관련 용어, 비즈니스 용어, 약어를 추출하는 기능을 정의한다.
 - 적용 범위: 메일 분석 파이프라인의 용어 추출 단계
 
 ---
@@ -56,7 +56,7 @@ flowchart TD
     B -- 예 --> D{10,000자 초과?}
     D -- 예 --> E[10,000자로 잘라냄]
     D -- 아니오 --> F[원본 유지]
-    E --> G[Claude API 호출<br/>용어 추출 프롬프트]
+    E --> G[Gemini API 호출<br/>용어 추출 프롬프트]
     F --> G
     G --> H[응답 파싱]
     H --> I[불용어 필터링<br/>TERM-EXT-002]
@@ -66,7 +66,7 @@ flowchart TD
     K --> L
 ```
 
-### Claude API 프롬프트 설계
+### Gemini API 프롬프트 설계
 
 시스템 프롬프트는 별도 파일(`lib/analysis/prompts/extract-terms.ts`)로 관리하여 유지보수성 확보.
 
@@ -79,12 +79,12 @@ flowchart TD
 ### 구현 가이드
 
 - **패턴**: Service 함수 - lib/analysis/term-extractor.ts
-- **API SDK**: @anthropic-ai/sdk 사용 (TERM-R-004)
-- **모델**: 환경변수 ANTHROPIC_MODEL (기본 claude-sonnet-4-6) (TERM-R-005)
+- **API SDK**: @google/generative-ai 사용 (TERM-R-004)
+- **모델**: 환경변수 GEMINI_MODEL (기본 gemini-2.0-flash) (TERM-R-005)
 - **재시도**: CMN-HTTP-001 활용 (최대 2회 재시도, 5초 간격, TERM-R-007)
 - **타임아웃**: 60초 (TERM-R-008)
 - **프롬프트 관리**: 별도 파일로 분리
-- **외부 의존성**: @anthropic-ai/sdk, CMN-HTTP-001
+- **외부 의존성**: @google/generative-ai, CMN-HTTP-001
 
 ### 관련 기능
 - **이 기능을 호출하는 기능**: TERM-BATCH-001
