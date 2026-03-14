@@ -27,7 +27,8 @@
       "mcp__plugin_playwright_playwright__browser_network_requests",
       "mcp__plugin_playwright_playwright__browser_type",
       "mcp__plugin_playwright_playwright__browser_handle_dialog",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(curl:*)"
     ]
   }
 }

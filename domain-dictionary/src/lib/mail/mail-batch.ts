@@ -1,8 +1,9 @@
-// 메일 수신 배치 오케스트레이션 (T5-3~T5-8 통합)
+// 메일 수신 배치 오케스트레이션 (T5-3~T5-8 + T6-8 통합)
 import { receiveMails } from './imap-receiver';
 import { saveAnalysisFile } from '@/lib/data/analysis-file';
 import { markMailsAsSeen, recordProcessingLog } from './mail-status';
 import { cleanupExpiredMailFiles, cleanupExpiredLogs } from '@/lib/data/cleanup';
+import { runBatchAnalysis } from '@/lib/analysis/batch-analyzer';
 import { logger } from '@/lib/logger';
 
 // 중복 실행 방지 잠금 (모듈 레벨 — API route와 스케줄러 공유)
@@ -29,6 +30,7 @@ export async function runMailBatch(): Promise<void> {
   logger.info('[mail-batch] 배치 시작');
 
   let mailCount = 0;
+  let analyzedCount = 0;
   let errorMessage: string | undefined;
 
   try {
@@ -46,7 +48,12 @@ export async function runMailBatch(): Promise<void> {
       }
     }
 
-    // Phase 2: 처리된 메일 SEEN 플래그 설정
+    // Phase 2: 용어 분석 파이프라인 (T6-8)
+    const { analyzed, failed: analysisFailed } = await runBatchAnalysis();
+    analyzedCount = analyzed;
+    logger.info('[mail-batch] 분석 파이프라인 완료', { analyzed, analysisFailed });
+
+    // Phase 2-b: SEEN 플래그 설정
     if (processedUids.length > 0) {
       await markMailsAsSeen(processedUids);
     }
@@ -55,7 +62,7 @@ export async function runMailBatch(): Promise<void> {
     cleanupExpiredMailFiles();
     cleanupExpiredLogs();
 
-    logger.info('[mail-batch] 배치 완료', { mailCount, processedUids: processedUids.length });
+    logger.info('[mail-batch] 배치 완료', { mailCount, processedUids: processedUids.length, analyzed });
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('[mail-batch] 배치 오류', { error: errorMessage });
@@ -65,7 +72,7 @@ export async function runMailBatch(): Promise<void> {
       processType: 'mail_receive',
       status: errorMessage ? 'failed' : 'success',
       mailCount,
-      analyzedCount: 0,
+      analyzedCount,
       errorMessage,
     });
 
