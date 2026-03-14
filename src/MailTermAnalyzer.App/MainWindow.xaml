@@ -1,0 +1,45 @@
+<Window
+    x:Class="MailTermAnalyzer.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="메일 용어 분석기">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 상단 타이틀 영역 -->
+        <TextBlock Grid.Row="0" Text="메일 용어 분석기"
+                   Style="{StaticResource TitleTextBlockStyle}"
+                   Margin="16,12"/>
+
+        <!-- 중앙 상태 콘텐츠 (Sprint 5에서 용어사전 뷰어로 교체) -->
+        <StackPanel Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="8">
+            <TextBlock Text="시스템 트레이에서 실행 중입니다."
+                       Style="{StaticResource BodyTextBlockStyle}"
+                       HorizontalAlignment="Center"/>
+            <TextBlock x:Name="StatusText"
+                       Text="마지막 메일 확인: -"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       HorizontalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+
+        <!-- 하단 상태 표시줄 (UI-04) -->
+        <Border Grid.Row="2"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,8">
+            <TextBlock x:Name="FooterText"
+                       Text="총 0개 용어 등록됨 | 마지막 메일 확인: -"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        </Border>
+    </Grid>
+</Window>

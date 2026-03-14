@@ -1,0 +1,1 @@
+- [project_function_architecture.md](project_function_architecture.md) - 메일 수신 용어 해설 도구의 기능 아키텍처 (공통 7개 + 도메인 17개, 의존성 구조)

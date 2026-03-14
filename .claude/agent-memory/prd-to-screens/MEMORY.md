@@ -1,0 +1,1 @@
+- [project_screen_structure.md](project_screen_structure.md) - 메일 수신 용어 해설 도구의 전체 화면 구조 (6개 화면, TRAY/MAIN/SET 3섹션)
