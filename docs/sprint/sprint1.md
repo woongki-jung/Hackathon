@@ -1066,6 +1066,11 @@ git commit -m "chore: Sprint 1 전체 빌드 검증 완료"
 
 ---
 
+## 검증 결과
+
+- [Sprint 1 검증 보고서 (test-report.md)](sprint1/test-report.md)
+- [배포 및 검증 가이드 (deploy.md)](sprint1/deploy.md)
+
 ## 완료 기준 (Definition of Done)
 
 | 항목 | 기준 | 검증 방법 |

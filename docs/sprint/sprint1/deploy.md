@@ -5,6 +5,7 @@
 - ✅ Core 프로젝트 빌드 (`dotnet build src/MailTermAnalyzer.Core/`) — 오류 없음
 - ✅ Infrastructure 프로젝트 빌드 (`dotnet build src/MailTermAnalyzer.Infrastructure/`) — 오류 없음
 - ✅ 단위 테스트 6개 통과 (`dotnet test tests/MailTermAnalyzer.Tests/`) — Passed: 6, Failed: 0
+- ❌ App 프로젝트 빌드 (`dotnet build src/MailTermAnalyzer.App/`) — Visual Studio C++ 빌드 도구 미설치로 실패 (수동 설치 필요)
 
 ## 수동 검증 필요
 
