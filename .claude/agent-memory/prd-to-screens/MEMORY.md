@@ -1,0 +1,1 @@
+- [project_screen_structure.md](project_screen_structure.md) - 메일 수신 용어 해설 웹 서비스의 전체 화면 구조 (7개 화면, Next.js 15 App Router 기반, LOGIN/DASH/WORK/DICT/SET/ADMIN 4섹션)

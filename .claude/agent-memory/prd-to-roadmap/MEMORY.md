@@ -1,0 +1,1 @@
+- [project_mail_term_analyzer.md](./project_mail_term_analyzer.md) - 메일 수신 업무용어 분석 데스크톱 앱 프로젝트 개요 및 기술 스택
