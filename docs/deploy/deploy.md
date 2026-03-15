@@ -45,14 +45,16 @@
 
 ### 2. 불필요한 환경변수 제거 (선택사항)
 
-- ⬜ Vercel 대시보드 → **Environment Variables** 에서 아래 항목 제거:
-  - `DATABASE_PATH`
+- ✅ `DATABASE_PATH` 제거 완료 (2026-03-15)
+- ⬜ Vercel 대시보드 → **Environment Variables** 에서 추가 확인:
   - `TURSO_DATABASE_URL` (있는 경우)
   - `TURSO_AUTH_TOKEN` (있는 경우)
 
 ### 3. 재배포 실행
 
-- ⬜ Postgres 연결 후 재배포 필요:
+- ✅ `vercel.json` (Cron Jobs 설정) 포함하여 `main` push → Vercel 자동 배포 트리거 (2026-03-15)
+- ⬜ Vercel 대시보드 → Deployments 탭에서 최신 배포 `Ready` 상태 확인
+- (필요 시) 수동 재배포:
   ```bash
   cd domain-dictionary
   npx vercel --prod --token $VERCEL_TOKEN --yes
@@ -68,25 +70,15 @@
 - ⬜ 분석 배치 수동 실행 — 정상 트리거
 - ⬜ 용어사전 검색 (`/dictionary`) — 분석 완료 후 전문 검색 동작
 
-### 5. Vercel Cron Jobs 등록 (분석 배치 자동 실행, 선택사항)
+### 5. Vercel Cron Jobs 등록 (분석 배치 자동 실행)
 
 > **Vercel Hobby(무료) 플랜 제약:**
 > - Cron Jobs: **1일 최대 2회** (특정 시간대만 지원)
 > - Serverless Function 실행 시간: **최대 10초**
 > - 시간당 실행이 필요하면 Pro 플랜(월 $20) 또는 외부 cron 서비스(GitHub Actions, cron-job.org) 활용
 
-- ⬜ `domain-dictionary/vercel.json` 생성 또는 수정:
-  ```json
-  {
-    "crons": [
-      {
-        "path": "/api/mail/check",
-        "schedule": "0 9 * * *"
-      }
-    ]
-  }
-  ```
-  > Hobby 플랜 예시: 매일 오전 9시 UTC 실행 (`0 9 * * *`)
+- ✅ `domain-dictionary/vercel.json` 생성 완료 (2026-03-15, 매일 09:00 UTC)
+- ⬜ 배포 후 Vercel 대시보드 → **Settings** → **Cron Jobs** 탭에서 등록 확인
 
 ---
 
@@ -99,8 +91,8 @@
 | `ADMIN_PASSWORD` | 초기 관리자 비밀번호 | ✅ 등록됨 |
 | `GEMINI_API_KEY` | Gemini API 키 | ✅ 등록됨 |
 | `GEMINI_MODEL` | 사용 모델명 | ✅ 등록됨 |
-| `POSTGRES_URL` | Vercel Postgres 연결 URL | ⬜ 수동 1단계 완료 후 등록 |
-| `POSTGRES_URL_NON_POOLING` | Drizzle 마이그레이션용 URL | ⬜ 수동 1단계 완료 후 등록 |
+| `POSTGRES_URL` | Vercel Postgres 연결 URL | ✅ 등록됨 |
+| `POSTGRES_URL_NON_POOLING` | Drizzle 마이그레이션용 URL | ✅ 등록됨 |
 
 ---
 
