@@ -31,13 +31,16 @@ export function GNB({ username, role }: GNBProps) {
         : 'text-indigo-100 hover:bg-indigo-600 hover:text-white'
     }`;
 
+  const ariaCurrent = (href: string): 'page' | undefined =>
+    isActive(href) ? 'page' : undefined;
+
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   }
 
   return (
-    <nav className="bg-indigo-800 text-white shadow-md">
+    <nav className="bg-indigo-800 text-white shadow-md" aria-label="주 메뉴">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* 로고 */}
@@ -46,19 +49,19 @@ export function GNB({ username, role }: GNBProps) {
               도메인 사전
             </Link>
             {/* 데스크탑 네비게이션 */}
-            <div className="hidden md:flex items-center gap-1">
-              <Link href="/dashboard" className={navLinkClass('/dashboard')}>
+            <div className="hidden md:flex items-center gap-1" role="list">
+              <Link href="/dashboard" className={navLinkClass('/dashboard')} aria-current={ariaCurrent('/dashboard')} role="listitem">
                 대시보드
               </Link>
-              <Link href="/dictionary" className={navLinkClass('/dictionary')}>
+              <Link href="/dictionary" className={navLinkClass('/dictionary')} aria-current={ariaCurrent('/dictionary')} role="listitem">
                 용어사전
               </Link>
               {role === 'admin' && (
                 <>
-                  <Link href="/settings" className={navLinkClass('/settings')}>
+                  <Link href="/settings" className={navLinkClass('/settings')} aria-current={ariaCurrent('/settings')} role="listitem">
                     환경설정
                   </Link>
-                  <Link href="/admin/users" className={navLinkClass('/admin/users')}>
+                  <Link href="/admin/users" className={navLinkClass('/admin/users')} aria-current={ariaCurrent('/admin/users')} role="listitem">
                     사용자 관리
                   </Link>
                 </>
@@ -86,9 +89,11 @@ export function GNB({ username, role }: GNBProps) {
 
           {/* 모바일 햄버거 */}
           <button
-            className="md:hidden p-2 rounded-md text-indigo-100 hover:bg-indigo-700 focus:outline-none"
+            className="md:hidden p-2 rounded-md text-indigo-100 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-white"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="메뉴 열기"
+            aria-label={menuOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
           >
             <span className="block w-5 h-0.5 bg-current mb-1" />
             <span className="block w-5 h-0.5 bg-current mb-1" />
@@ -99,19 +104,19 @@ export function GNB({ username, role }: GNBProps) {
 
       {/* 모바일 드롭다운 메뉴 */}
       {menuOpen && (
-        <div className="md:hidden border-t border-indigo-700 px-4 pt-2 pb-4 space-y-1">
-          <Link href="/dashboard" className={mobileNavLinkClass('/dashboard')} onClick={() => setMenuOpen(false)}>
+        <div id="mobile-menu" className="md:hidden border-t border-indigo-700 px-4 pt-2 pb-4 space-y-1" role="list">
+          <Link href="/dashboard" className={mobileNavLinkClass('/dashboard')} aria-current={ariaCurrent('/dashboard')} role="listitem" onClick={() => setMenuOpen(false)}>
             대시보드
           </Link>
-          <Link href="/dictionary" className={mobileNavLinkClass('/dictionary')} onClick={() => setMenuOpen(false)}>
+          <Link href="/dictionary" className={mobileNavLinkClass('/dictionary')} aria-current={ariaCurrent('/dictionary')} role="listitem" onClick={() => setMenuOpen(false)}>
             용어사전
           </Link>
           {role === 'admin' && (
             <>
-              <Link href="/settings" className={mobileNavLinkClass('/settings')} onClick={() => setMenuOpen(false)}>
+              <Link href="/settings" className={mobileNavLinkClass('/settings')} aria-current={ariaCurrent('/settings')} role="listitem" onClick={() => setMenuOpen(false)}>
                 환경설정
               </Link>
-              <Link href="/admin/users" className={mobileNavLinkClass('/admin/users')} onClick={() => setMenuOpen(false)}>
+              <Link href="/admin/users" className={mobileNavLinkClass('/admin/users')} aria-current={ariaCurrent('/admin/users')} role="listitem" onClick={() => setMenuOpen(false)}>
                 사용자 관리
               </Link>
             </>

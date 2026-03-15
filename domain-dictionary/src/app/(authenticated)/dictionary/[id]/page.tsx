@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCategoryColor, getCategoryLabel } from '@/lib/utils/category';
+import { formatDate } from '@/lib/utils/date';
 
 interface TermDetail {
   id: string;
@@ -20,14 +21,6 @@ interface SourceFile {
   mailFileName: string;
   mailSubject: string | null;
   mailReceivedAt: string | null;
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleString('ko-KR', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  }).replace(/\. /g, '-').replace('.', '').trim();
 }
 
 export default function TermDetailPage() {
