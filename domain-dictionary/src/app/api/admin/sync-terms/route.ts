@@ -17,7 +17,7 @@ export async function POST() {
   if (isNextResponse(sessionOrResponse)) return sessionOrResponse;
 
   try {
-    const allTerms = db.select().from(terms).all();
+    const allTerms = await db.select().from(terms);
 
     let synced = 0;
     let skipped = 0;

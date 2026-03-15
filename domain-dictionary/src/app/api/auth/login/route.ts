@@ -9,7 +9,6 @@ import { sessionOptions, type SessionData } from '@/lib/auth/session';
 import { validateUsername } from '@/lib/validators/auth';
 import { isRateLimited, getClientIp } from '@/lib/auth/rate-limiter';
 
-// better-sqlite3는 Node.js 런타임 전용
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
@@ -44,11 +43,10 @@ export async function POST(request: Request) {
     }
 
     // DB에서 사용자 조회 (소프트 삭제 및 비활성 계정 제외)
-    const user = db
+    const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.username, username))
-      .get();
+      .where(eq(users.username, username));
 
     if (!user || user.deletedAt !== null || user.isActive !== 1) {
       return NextResponse.json(

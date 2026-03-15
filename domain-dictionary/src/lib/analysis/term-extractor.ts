@@ -72,7 +72,7 @@ export async function extractTerms(textBody: string): Promise<ExtractedTerm[]> {
   }
 
   // 불용어 필터링
-  const stopWordSet = getStopWords();
+  const stopWordSet = await getStopWords();
   const termNames = terms.map((t) => t.name);
   const filtered = filterStopWords(termNames, stopWordSet);
   const filteredSet = new Set(filtered);

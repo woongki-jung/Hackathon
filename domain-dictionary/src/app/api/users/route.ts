@@ -14,7 +14,7 @@ export async function GET() {
   const authResult = await requireAdmin();
   if (isNextResponse(authResult)) return authResult;
 
-  const items = db
+  const items = await db
     .select({
       id: users.id,
       username: users.username,
@@ -23,8 +23,7 @@ export async function GET() {
       createdAt: users.createdAt,
     })
     .from(users)
-    .where(isNull(users.deletedAt))
-    .all();
+    .where(isNull(users.deletedAt));
 
   return NextResponse.json({ success: true, data: { items } });
 }
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
   if (roleError) return NextResponse.json({ success: false, message: roleError }, { status: 400 });
 
   // 중복 확인 (소프트 삭제 포함)
-  const existing = db.select().from(users).where(eq(users.username, username!)).get();
+  const [existing] = await db.select().from(users).where(eq(users.username, username!));
   if (existing) {
     return NextResponse.json(
       { success: false, message: '이미 사용 중인 아이디입니다.' },
@@ -67,7 +66,7 @@ export async function POST(request: Request) {
   const passwordHash = await bcrypt.hash(password!, 10);
   const now = new Date().toISOString();
 
-  const newUser = db
+  const [newUser] = await db
     .insert(users)
     .values({
       username: username!,
@@ -83,8 +82,7 @@ export async function POST(request: Request) {
       role: users.role,
       isActive: users.isActive,
       createdAt: users.createdAt,
-    })
-    .get();
+    });
 
   return NextResponse.json({ success: true, data: newUser }, { status: 201 });
 }

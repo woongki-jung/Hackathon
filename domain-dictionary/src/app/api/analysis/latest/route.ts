@@ -17,7 +17,7 @@ export async function GET() {
   }
 
   try {
-    const latest = db
+    const [latest] = await db
       .select({
         id: analysisQueue.id,
         fileName: analysisQueue.fileName,
@@ -32,8 +32,7 @@ export async function GET() {
       .from(analysisQueue)
       .where(eq(analysisQueue.status, 'completed'))
       .orderBy(desc(analysisQueue.analyzedAt))
-      .limit(1)
-      .get();
+      .limit(1);
 
     logger.info('[api/analysis/latest] 최신 분석 결과 조회', { userId: session.userId });
 

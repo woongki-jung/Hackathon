@@ -57,12 +57,12 @@ export interface SaveTermResult {
  * - 신규: INSERT
  * - 기존: 빈도 증가 + 해설 업데이트
  */
-export function saveTerm(
+export async function saveTerm(
   term: ExtractedTerm,
   source: { fileName: string; sourceDescription: string | null; receivedAt: string | null }
-): SaveTermResult {
+): Promise<SaveTermResult> {
   const now = new Date().toISOString();
-  const existing = db.select().from(terms).where(eq(terms.name, term.name)).get();
+  const [existing] = await db.select().from(terms).where(eq(terms.name, term.name));
 
   let termId: string;
   let isNew: boolean;
@@ -70,7 +70,7 @@ export function saveTerm(
   if (existing) {
     // 기존 용어: 빈도 증가 + 해설 업데이트
     const newFrequency = existing.frequency + 1;
-    db.update(terms)
+    await db.update(terms)
       .set({
         description: term.description,
         category: term.category,
@@ -79,15 +79,14 @@ export function saveTerm(
         lastSourceDate: source.receivedAt,
         updatedAt: now,
       })
-      .where(eq(terms.id, existing.id))
-      .run();
+      .where(eq(terms.id, existing.id));
 
     termId = existing.id;
     isNew = false;
     logger.info('[dictionary-store] 용어 업데이트', { name: term.name, frequency: newFrequency });
   } else {
     // 신규 용어: INSERT
-    const inserted = db.insert(terms)
+    const [inserted] = await db.insert(terms)
       .values({
         name: term.name,
         category: term.category,
@@ -98,8 +97,7 @@ export function saveTerm(
         createdAt: now,
         updatedAt: now,
       })
-      .returning({ id: terms.id })
-      .get();
+      .returning({ id: terms.id });
 
     termId = inserted.id;
     isNew = true;
@@ -108,21 +106,20 @@ export function saveTerm(
 
   // 출처 파일 기록 (중복 무시)
   try {
-    db.insert(termSourceFiles)
+    await db.insert(termSourceFiles)
       .values({
         termId,
         sourceFileName: source.fileName,
         sourceDescription: source.sourceDescription,
         receivedAt: source.receivedAt,
         createdAt: now,
-      })
-      .run();
+      });
   } catch {
     // unique constraint 위반 시 무시
   }
 
   // 해설집 파일 저장
-  const latest = db.select().from(terms).where(eq(terms.id, termId)).get();
+  const [latest] = await db.select().from(terms).where(eq(terms.id, termId));
   if (latest) {
     const mdContent = buildGlossaryMarkdown({
       name: latest.name,

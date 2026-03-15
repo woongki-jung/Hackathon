@@ -1,7 +1,7 @@
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { db } from '@/db';
+import { sql } from '@vercel/postgres';
 import { sessionOptions, type SessionData } from '@/lib/auth/session';
 import { VALID_CATEGORIES } from '@/lib/utils/category';
 import { logger } from '@/lib/logger';
@@ -10,12 +10,7 @@ export const runtime = 'nodejs';
 
 const PAGE_SIZE = 20;
 
-// FTS5 쿼리용 특수문자 이스케이프
-function sanitizeFts(query: string): string {
-  return query.replace(/["*^()]/g, ' ').trim();
-}
-
-// DICT-001: 용어 검색 (FTS5 전문 검색 + 카테고리 필터 + 페이지네이션)
+// DICT-001: 용어 검색 (PostgreSQL FTS + 카테고리 필터 + 페이지네이션)
 export async function GET(request: Request) {
   const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
   if (!session.userId) {
@@ -28,8 +23,6 @@ export async function GET(request: Request) {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
   const offset = (page - 1) * PAGE_SIZE;
 
-  const sqlite = db.$client;
-
   try {
     let rows: { id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string; snippet: string | null }[];
     let totalCount: number;
@@ -37,57 +30,80 @@ export async function GET(request: Request) {
     const catFilter = VALID_CATEGORIES.includes(category as never) ? category : null;
 
     if (q) {
-      const safeQ = sanitizeFts(q);
-      if (!safeQ) {
-        return NextResponse.json({ success: true, data: { items: [], pagination: { page, pageSize: PAGE_SIZE, total: 0, totalPages: 0 } } });
+      // PostgreSQL FTS 검색: plainto_tsquery + ts_headline 스니펫
+      if (catFilter) {
+        const ftsResult = await sql.query<{ id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string; snippet: string | null }>(
+          `SELECT
+            t.id, t.name, t.category, t.description, t.frequency, t.updated_at as "updatedAt",
+            ts_headline('simple', t.description, plainto_tsquery('simple', $1), 'MaxFragments=1,MaxWords=16,MinWords=3') as snippet
+          FROM terms t
+          WHERE to_tsvector('simple', coalesce(t.name,'') || ' ' || coalesce(t.description,'')) @@ plainto_tsquery('simple', $1)
+            AND t.category = $2
+          ORDER BY
+            ts_rank(to_tsvector('simple', coalesce(t.name,'') || ' ' || coalesce(t.description,'')), plainto_tsquery('simple', $1)) DESC,
+            t.frequency DESC
+          LIMIT $3 OFFSET $4`,
+          [q, catFilter, PAGE_SIZE, offset]
+        );
+        const countResult = await sql.query<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt
+          FROM terms t
+          WHERE to_tsvector('simple', coalesce(t.name,'') || ' ' || coalesce(t.description,'')) @@ plainto_tsquery('simple', $1)
+            AND t.category = $2`,
+          [q, catFilter]
+        );
+        rows = ftsResult.rows;
+        totalCount = parseInt(countResult.rows[0]?.cnt ?? '0', 10);
+      } else {
+        const ftsResult = await sql.query<{ id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string; snippet: string | null }>(
+          `SELECT
+            t.id, t.name, t.category, t.description, t.frequency, t.updated_at as "updatedAt",
+            ts_headline('simple', t.description, plainto_tsquery('simple', $1), 'MaxFragments=1,MaxWords=16,MinWords=3') as snippet
+          FROM terms t
+          WHERE to_tsvector('simple', coalesce(t.name,'') || ' ' || coalesce(t.description,'')) @@ plainto_tsquery('simple', $1)
+          ORDER BY
+            ts_rank(to_tsvector('simple', coalesce(t.name,'') || ' ' || coalesce(t.description,'')), plainto_tsquery('simple', $1)) DESC,
+            t.frequency DESC
+          LIMIT $2 OFFSET $3`,
+          [q, PAGE_SIZE, offset]
+        );
+        const countResult = await sql.query<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt
+          FROM terms t
+          WHERE to_tsvector('simple', coalesce(t.name,'') || ' ' || coalesce(t.description,'')) @@ plainto_tsquery('simple', $1)`,
+          [q]
+        );
+        rows = ftsResult.rows;
+        totalCount = parseInt(countResult.rows[0]?.cnt ?? '0', 10);
       }
-
-      // FTS5 검색: MATCH + 카테고리 필터 (snippet() 으로 하이라이트 마커 포함)
-      const ftsQuery = catFilter
-        ? `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt,
-             snippet(terms_fts, 1, '[[', ']]', '...', 16) as snippet
-           FROM terms_fts fts
-           JOIN terms t ON fts.rowid = t.rowid
-           WHERE terms_fts MATCH ? AND t.category = ?
-           ORDER BY bm25(terms_fts), t.frequency DESC
-           LIMIT ? OFFSET ?`
-        : `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt,
-             snippet(terms_fts, 1, '[[', ']]', '...', 16) as snippet
-           FROM terms_fts fts
-           JOIN terms t ON fts.rowid = t.rowid
-           WHERE terms_fts MATCH ?
-           ORDER BY bm25(terms_fts), t.frequency DESC
-           LIMIT ? OFFSET ?`;
-
-      const countQuery = catFilter
-        ? `SELECT COUNT(*) as cnt FROM terms_fts fts JOIN terms t ON fts.rowid = t.rowid WHERE terms_fts MATCH ? AND t.category = ?`
-        : `SELECT COUNT(*) as cnt FROM terms_fts fts JOIN terms t ON fts.rowid = t.rowid WHERE terms_fts MATCH ?`;
-
-      const ftsArgs = catFilter ? [safeQ, catFilter] : [safeQ];
-      rows = catFilter
-        ? sqlite.prepare(ftsQuery).all(safeQ, catFilter, PAGE_SIZE, offset) as typeof rows
-        : sqlite.prepare(ftsQuery).all(safeQ, PAGE_SIZE, offset) as typeof rows;
-
-      const countRow = sqlite.prepare(countQuery).get(...ftsArgs) as { cnt: number };
-      totalCount = countRow?.cnt ?? 0;
     } else {
       // 검색어 없음: 빈도 순 전체 목록
-      const listQuery = catFilter
-        ? `SELECT id, name, category, description, frequency, updated_at as updatedAt, NULL as snippet FROM terms WHERE category = ? ORDER BY frequency DESC LIMIT ? OFFSET ?`
-        : `SELECT id, name, category, description, frequency, updated_at as updatedAt, NULL as snippet FROM terms ORDER BY frequency DESC LIMIT ? OFFSET ?`;
-
-      const countQuery = catFilter
-        ? `SELECT COUNT(*) as cnt FROM terms WHERE category = ?`
-        : `SELECT COUNT(*) as cnt FROM terms`;
-
-      rows = catFilter
-        ? sqlite.prepare(listQuery).all(catFilter, PAGE_SIZE, offset) as typeof rows
-        : sqlite.prepare(listQuery).all(PAGE_SIZE, offset) as typeof rows;
-
-      const countRow = catFilter
-        ? sqlite.prepare(countQuery).get(catFilter) as { cnt: number }
-        : sqlite.prepare(countQuery).get() as { cnt: number };
-      totalCount = countRow?.cnt ?? 0;
+      if (catFilter) {
+        const listResult = await sql.query<{ id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string; snippet: null }>(
+          `SELECT id, name, category, description, frequency, updated_at as "updatedAt", NULL as snippet
+          FROM terms WHERE category = $1
+          ORDER BY frequency DESC LIMIT $2 OFFSET $3`,
+          [catFilter, PAGE_SIZE, offset]
+        );
+        const countResult = await sql.query<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt FROM terms WHERE category = $1`,
+          [catFilter]
+        );
+        rows = listResult.rows;
+        totalCount = parseInt(countResult.rows[0]?.cnt ?? '0', 10);
+      } else {
+        const listResult = await sql.query<{ id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string; snippet: null }>(
+          `SELECT id, name, category, description, frequency, updated_at as "updatedAt", NULL as snippet
+          FROM terms
+          ORDER BY frequency DESC LIMIT $1 OFFSET $2`,
+          [PAGE_SIZE, offset]
+        );
+        const countResult = await sql.query<{ cnt: string }>(
+          `SELECT COUNT(*) as cnt FROM terms`
+        );
+        rows = listResult.rows;
+        totalCount = parseInt(countResult.rows[0]?.cnt ?? '0', 10);
+      }
     }
 
     // 해설 미리보기 200자, snippet null 정규화

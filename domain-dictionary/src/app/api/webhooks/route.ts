@@ -12,7 +12,7 @@ export async function GET() {
   const authResult = await requireAdmin();
   if (isNextResponse(authResult)) return authResult;
 
-  const list = db.select().from(webhooks).all();
+  const list = await db.select().from(webhooks);
   logger.info('[api/webhooks] 목록 조회');
 
   return NextResponse.json({ success: true, data: list });
@@ -41,17 +41,16 @@ export async function POST(request: Request) {
   }
 
   // 중복 코드 확인
-  const existing = db.select().from(webhooks).where(eq(webhooks.code, code)).get();
+  const [existing] = await db.select().from(webhooks).where(eq(webhooks.code, code));
   if (existing) {
     return NextResponse.json({ success: false, message: '이미 사용 중인 코드입니다.' }, { status: 409 });
   }
 
   const now = new Date().toISOString();
-  const inserted = db
+  const [inserted] = await db
     .insert(webhooks)
     .values({ code, description: description.trim(), createdAt: now })
-    .returning()
-    .get();
+    .returning();
 
   logger.info('[api/webhooks] 웹훅 생성', { code, userId: authResult.userId });
 

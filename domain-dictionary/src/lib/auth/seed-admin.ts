@@ -33,7 +33,7 @@ export async function seedAdmin(): Promise<void> {
   }
 
   // 이미 존재하는 경우 건너뜀
-  const existing = db.select().from(users).where(eq(users.username, username)).get();
+  const [existing] = await db.select().from(users).where(eq(users.username, username));
   if (existing) {
     console.log(`[seed-admin] 관리자 계정이 이미 존재합니다.`);
     return;
@@ -42,14 +42,13 @@ export async function seedAdmin(): Promise<void> {
   // bcrypt 해싱 후 삽입
   const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
-  db.insert(users)
+  await db.insert(users)
     .values({
       username,
       passwordHash,
       role: 'admin',
       isActive: 1,
-    })
-    .run();
+    });
 
   console.log(`[seed-admin] 관리자 계정 '${username}'이 생성되었습니다.`);
 }

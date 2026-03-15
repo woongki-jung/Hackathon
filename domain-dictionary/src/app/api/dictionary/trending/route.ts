@@ -19,7 +19,7 @@ export async function GET() {
   }
 
   try {
-    const items = db
+    const items = await db
       .select({
         id: terms.id,
         name: terms.name,
@@ -28,8 +28,7 @@ export async function GET() {
       })
       .from(terms)
       .orderBy(desc(terms.frequency))
-      .limit(10)
-      .all();
+      .limit(10);
 
     logger.info('[api/dictionary/trending] 트렌드 조회', { count: items.length });
 

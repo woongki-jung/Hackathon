@@ -22,13 +22,13 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const term = db.select().from(terms).where(eq(terms.id, id)).get();
+    const [term] = await db.select().from(terms).where(eq(terms.id, id));
 
     if (!term) {
       return NextResponse.json({ success: false, message: '용어를 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    const sources = db
+    const sourcesRaw = await db
       .select({
         id: termSourceFiles.id,
         sourceFileName: termSourceFiles.sourceFileName,
@@ -39,9 +39,9 @@ export async function GET(
       .from(termSourceFiles)
       .where(eq(termSourceFiles.termId, id))
       .orderBy(termSourceFiles.receivedAt)
-      .limit(10)
-      .all()
-      .reverse(); // 최신순
+      .limit(10);
+
+    const sources = sourcesRaw.reverse(); // 최신순
 
     logger.info('[api/dictionary/terms/:id] 용어 상세 조회', { id });
 

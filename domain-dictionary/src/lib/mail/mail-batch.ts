@@ -1,7 +1,7 @@
 // 분석 배치 오케스트레이션 (웹훅 수신 후 분석 파이프라인 실행)
 import { db } from '@/db';
 import { mailProcessingLogs } from '@/db/schema';
-import { cleanupExpiredMailFiles, cleanupExpiredLogs } from '@/lib/data/cleanup';
+import { cleanupExpiredLogs } from '@/lib/data/cleanup';
 import { runBatchAnalysis } from '@/lib/analysis/batch-analyzer';
 import { logger } from '@/lib/logger';
 
@@ -36,9 +36,8 @@ export async function runMailBatch(): Promise<void> {
     analyzedCount = analyzed;
     logger.info('[mail-batch] 분석 파이프라인 완료', { analyzed, failed });
 
-    // 정리
-    cleanupExpiredMailFiles();
-    cleanupExpiredLogs();
+    // 만료 로그 정리
+    await cleanupExpiredLogs();
 
     logger.info('[mail-batch] 배치 완료', { analyzed });
   } catch (err) {
@@ -47,7 +46,7 @@ export async function runMailBatch(): Promise<void> {
   } finally {
     // 처리 이력 기록
     const now = new Date().toISOString();
-    db.insert(mailProcessingLogs)
+    await db.insert(mailProcessingLogs)
       .values({
         executedAt: startedAt,
         completedAt: now,
@@ -58,8 +57,7 @@ export async function runMailBatch(): Promise<void> {
         errorMessage: errorMessage ?? null,
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
     isRunning = false;
     logger.info('[mail-batch] 배치 종료', { startedAt, endedAt: now });

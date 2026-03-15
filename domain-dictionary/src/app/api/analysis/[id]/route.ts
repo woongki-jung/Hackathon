@@ -22,14 +22,14 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const item = db.select().from(analysisQueue).where(eq(analysisQueue.id, id)).get();
+    const [item] = await db.select().from(analysisQueue).where(eq(analysisQueue.id, id));
 
     if (!item) {
       return NextResponse.json({ success: false, message: '분석 항목을 찾을 수 없습니다.' }, { status: 404 });
     }
 
     // fileName으로 연결된 용어 목록 조회
-    const extractedTerms = db
+    const extractedTerms = await db
       .select({
         id: terms.id,
         name: terms.name,
@@ -37,8 +37,7 @@ export async function GET(
       })
       .from(termSourceFiles)
       .innerJoin(terms, eq(termSourceFiles.termId, terms.id))
-      .where(eq(termSourceFiles.sourceFileName, item.fileName))
-      .all();
+      .where(eq(termSourceFiles.sourceFileName, item.fileName));
 
     logger.info('[api/analysis/:id] 분석 상세 조회', { id, userId: session.userId });
 

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const offset = (page - 1) * PAGE_SIZE;
 
   try {
-    const items = db
+    const items = await db
       .select({
         id: analysisQueue.id,
         fileName: analysisQueue.fileName,
@@ -39,11 +39,11 @@ export async function GET(request: Request) {
       .from(analysisQueue)
       .orderBy(desc(analysisQueue.createdAt))
       .limit(PAGE_SIZE)
-      .offset(offset)
-      .all();
+      .offset(offset);
 
     // 전체 건수 조회
-    const total = (db.select({ id: analysisQueue.id }).from(analysisQueue).all()).length;
+    const allItems = await db.select({ id: analysisQueue.id }).from(analysisQueue);
+    const total = allItems.length;
 
     logger.info('[api/analysis/history] 분석 이력 조회', { userId: session.userId, page });
 

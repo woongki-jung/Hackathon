@@ -17,12 +17,12 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const existing = db.select().from(webhooks).where(eq(webhooks.id, id)).get();
+  const [existing] = await db.select().from(webhooks).where(eq(webhooks.id, id));
   if (!existing) {
     return NextResponse.json({ success: false, message: '웹훅을 찾을 수 없습니다.' }, { status: 404 });
   }
 
-  db.delete(webhooks).where(eq(webhooks.id, id)).run();
+  await db.delete(webhooks).where(eq(webhooks.id, id));
 
   logger.info('[api/webhooks] 웹훅 삭제', { id, code: existing.code, userId: authResult.userId });
 

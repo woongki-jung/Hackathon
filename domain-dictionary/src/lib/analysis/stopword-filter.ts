@@ -5,8 +5,8 @@ import { stopWords } from '@/db/schema';
 /**
  * stop_words 테이블에서 불용어 목록을 가져옵니다.
  */
-export function getStopWords(): Set<string> {
-  const rows = db.select({ word: stopWords.word }).from(stopWords).all();
+export async function getStopWords(): Promise<Set<string>> {
+  const rows = await db.select({ word: stopWords.word }).from(stopWords);
   return new Set(rows.map((r) => r.word.toLowerCase()));
 }
 

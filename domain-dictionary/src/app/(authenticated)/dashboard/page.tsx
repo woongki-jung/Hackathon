@@ -7,7 +7,6 @@ import { Spinner } from '@/components/ui/Spinner';
 import { formatDate } from '@/lib/utils/date';
 
 interface ServiceStatus {
-  scheduler: { status: 'running' | 'stopped' };
   webhook: { count: number };
   lastRunAt: string | null;
   lastRunStatus: string | null;
@@ -179,12 +178,7 @@ export default function DashboardPage() {
       {/* 서비스 상태 카드 */}
       <section className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-base font-semibold text-gray-800 mb-4">서비스 상태</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatusCard
-            label="스케줄러"
-            value={status?.scheduler.status === 'running' ? '실행 중' : '중지됨'}
-            badge={status?.scheduler.status === 'running' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}
-          />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <StatusCard
             label="웹훅"
             value={`${status?.webhook.count ?? 0}개 등록됨`}

@@ -15,12 +15,12 @@ export interface AnalysisFileEntry {
 /**
  * 텍스트를 파일로 저장하고 analysis_queue에 pending 상태로 등록합니다.
  */
-export function saveAnalysisFile(
+export async function saveAnalysisFile(
   fileName: string,
   textContent: string,
   sourceDescription: string | null,
   receivedAt: string | null
-): AnalysisFileEntry {
+): Promise<AnalysisFileEntry> {
   const filePath = path.join(MAILS_DIR, fileName);
 
   // 파일 저장
@@ -30,7 +30,7 @@ export function saveAnalysisFile(
 
   // analysis_queue 등록 (중복 시 무시)
   try {
-    db.insert(analysisQueue)
+    await db.insert(analysisQueue)
       .values({
         fileName,
         status: 'pending',
@@ -38,8 +38,7 @@ export function saveAnalysisFile(
         receivedAt,
         createdAt: now,
         updatedAt: now,
-      })
-      .run();
+      });
 
     logger.info('[analysis-file] 분석 큐 등록', { fileName });
   } catch (err) {

@@ -6,7 +6,6 @@ import { db } from '@/db';
 import { mailProcessingLogs, webhooks } from '@/db/schema';
 import { sessionOptions, type SessionData } from '@/lib/auth/session';
 import { getAllSettings } from '@/lib/config/settings-service';
-import { isSchedulerRunning } from '@/lib/scheduler/cron-scheduler';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
@@ -22,15 +21,14 @@ export async function GET() {
     const settings = await getAllSettings();
 
     // 최근 실행 로그 조회
-    const recentLog = db
+    const [recentLog] = await db
       .select()
       .from(mailProcessingLogs)
       .orderBy(desc(mailProcessingLogs.executedAt))
-      .limit(1)
-      .get();
+      .limit(1);
 
     // 등록된 웹훅 수 조회
-    const webhookCountResult = db.select({ value: count() }).from(webhooks).get();
+    const [webhookCountResult] = await db.select({ value: count() }).from(webhooks);
     const webhookCount = webhookCountResult?.value ?? 0;
 
     logger.info('[api/mail/status] 서비스 상태 조회', { userId: session.userId });
@@ -38,9 +36,6 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        scheduler: {
-          status: isSchedulerRunning() ? 'running' : 'stopped',
-        },
         webhook: {
           count: webhookCount,
         },
