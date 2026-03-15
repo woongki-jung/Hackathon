@@ -23,7 +23,7 @@ export const appSettings = sqliteTable('app_settings', {
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
 
-// DATA-003: 메일 처리 로그 테이블
+// DATA-003: 처리 로그 테이블
 export const mailProcessingLogs = sqliteTable('mail_processing_logs', {
   id: text('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   executedAt: text('executed_at').notNull(),
@@ -45,8 +45,8 @@ export const terms = sqliteTable('terms', {
   description: text('description').notNull(),
   filePath: text('file_path', { length: 500 }),
   frequency: integer('frequency').notNull().default(1),
-  lastSourceMailSubject: text('last_source_mail_subject', { length: 500 }),
-  lastSourceMailDate: text('last_source_mail_date'),
+  lastSourceDescription: text('last_source_description', { length: 500 }),
+  lastSourceDate: text('last_source_date'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
@@ -57,12 +57,12 @@ export const termSourceFiles = sqliteTable(
   {
     id: text('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
     termId: text('term_id', { length: 36 }).notNull().references(() => terms.id),
-    mailFileName: text('mail_file_name', { length: 255 }).notNull(),
-    mailSubject: text('mail_subject', { length: 500 }),
-    mailReceivedAt: text('mail_received_at'),
+    sourceFileName: text('source_file_name', { length: 255 }).notNull(),
+    sourceDescription: text('source_description', { length: 500 }),
+    receivedAt: text('received_at'),
     createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   },
-  (table) => [uniqueIndex('term_source_files_term_id_mail_file_name_idx').on(table.termId, table.mailFileName)]
+  (table) => [uniqueIndex('term_source_files_term_id_source_file_name_idx').on(table.termId, table.sourceFileName)]
 );
 
 // DATA-006: 불용어 테이블
@@ -76,6 +76,7 @@ export const stopWords = sqliteTable('stop_words', {
 export const analysisQueue = sqliteTable('analysis_queue', {
   id: text('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   fileName: text('file_name', { length: 255 }).unique().notNull(),
+  webhookCode: text('webhook_code', { length: 100 }),
   status: text('status', { length: 20 }).notNull().default('pending'),
   summary: text('summary'),
   actionItems: text('action_items'),
@@ -83,8 +84,16 @@ export const analysisQueue = sqliteTable('analysis_queue', {
   retryCount: integer('retry_count').notNull().default(0),
   errorMessage: text('error_message', { length: 1000 }),
   analyzedAt: text('analyzed_at'),
-  mailSubject: text('mail_subject', { length: 500 }),
-  mailReceivedAt: text('mail_received_at'),
+  sourceDescription: text('source_description', { length: 500 }),
+  receivedAt: text('received_at'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
+// DATA-008: 웹훅 테이블
+export const webhooks = sqliteTable('webhooks', {
+  id: text('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  code: text('code', { length: 100 }).unique().notNull(),
+  description: text('description', { length: 500 }).notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });

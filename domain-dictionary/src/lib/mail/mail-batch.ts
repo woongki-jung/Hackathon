@@ -1,7 +1,6 @@
-// 메일 수신 배치 오케스트레이션 (T5-3~T5-8 + T6-8 통합)
-import { receiveMails } from './imap-receiver';
-import { saveAnalysisFile } from '@/lib/data/analysis-file';
-import { markMailsAsSeen, recordProcessingLog } from './mail-status';
+// 분석 배치 오케스트레이션 (웹훅 수신 후 분석 파이프라인 실행)
+import { db } from '@/db';
+import { mailProcessingLogs } from '@/db/schema';
 import { cleanupExpiredMailFiles, cleanupExpiredLogs } from '@/lib/data/cleanup';
 import { runBatchAnalysis } from '@/lib/analysis/batch-analyzer';
 import { logger } from '@/lib/logger';
@@ -14,10 +13,9 @@ export function isMailBatchRunning(): boolean {
 }
 
 /**
- * 메일 수신 배치를 실행합니다.
- * Phase 1: 메일 수신 → 파일 저장 → 큐 등록
- * Phase 2: SEEN 플래그 설정 (Sprint 6 분석 파이프라인 연동 예정)
- * Phase 3: 만료 파일/로그 정리
+ * 분석 배치를 실행합니다.
+ * - analysis_queue의 pending 항목을 분석 파이프라인으로 처리
+ * - 만료 파일/로그 정리
  */
 export async function runMailBatch(): Promise<void> {
   if (isRunning) {
@@ -29,54 +27,41 @@ export async function runMailBatch(): Promise<void> {
   const startedAt = new Date().toISOString();
   logger.info('[mail-batch] 배치 시작');
 
-  let mailCount = 0;
   let analyzedCount = 0;
   let errorMessage: string | undefined;
 
   try {
-    // Phase 1: 메일 수신 및 큐 등록
-    const mails = await receiveMails();
-    mailCount = mails.length;
-
-    const processedUids: number[] = [];
-    for (const mail of mails) {
-      try {
-        saveAnalysisFile(mail.fileName, mail.textBody, mail.subject, mail.receivedAt);
-        processedUids.push(mail.uid);
-      } catch (err) {
-        logger.warn('[mail-batch] 메일 파일 저장 실패', { uid: mail.uid, error: String(err) });
-      }
-    }
-
-    // Phase 2: 용어 분석 파이프라인 (T6-8)
-    const { analyzed, failed: analysisFailed } = await runBatchAnalysis();
+    // 분석 파이프라인
+    const { analyzed, failed } = await runBatchAnalysis();
     analyzedCount = analyzed;
-    logger.info('[mail-batch] 분석 파이프라인 완료', { analyzed, analysisFailed });
+    logger.info('[mail-batch] 분석 파이프라인 완료', { analyzed, failed });
 
-    // Phase 2-b: SEEN 플래그 설정
-    if (processedUids.length > 0) {
-      await markMailsAsSeen(processedUids);
-    }
-
-    // Phase 3: 정리
+    // 정리
     cleanupExpiredMailFiles();
     cleanupExpiredLogs();
 
-    logger.info('[mail-batch] 배치 완료', { mailCount, processedUids: processedUids.length, analyzed });
+    logger.info('[mail-batch] 배치 완료', { analyzed });
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('[mail-batch] 배치 오류', { error: errorMessage });
   } finally {
     // 처리 이력 기록
-    recordProcessingLog({
-      processType: 'mail_receive',
-      status: errorMessage ? 'failed' : 'success',
-      mailCount,
-      analyzedCount,
-      errorMessage,
-    });
+    const now = new Date().toISOString();
+    db.insert(mailProcessingLogs)
+      .values({
+        executedAt: startedAt,
+        completedAt: now,
+        processType: 'analysis',
+        status: errorMessage ? 'failed' : 'success',
+        mailCount: 0,
+        analyzedCount,
+        errorMessage: errorMessage ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
 
     isRunning = false;
-    logger.info('[mail-batch] 배치 종료', { startedAt, endedAt: new Date().toISOString() });
+    logger.info('[mail-batch] 배치 종료', { startedAt, endedAt: now });
   }
 }

@@ -4,11 +4,6 @@ import { appSettings } from '@/db/schema';
 
 // 지원하는 설정 키 목록
 export const SETTING_KEYS = [
-  'mail.imap.host',
-  'mail.imap.port',
-  'mail.imap.username',
-  'mail.imap.use_ssl',
-  'mail.check_interval',
   'analysis.model',
 ] as const;
 

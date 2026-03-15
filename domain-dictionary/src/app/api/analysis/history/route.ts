@@ -27,8 +27,8 @@ export async function GET(request: Request) {
       .select({
         id: analysisQueue.id,
         fileName: analysisQueue.fileName,
-        mailSubject: analysisQueue.mailSubject,
-        mailReceivedAt: analysisQueue.mailReceivedAt,
+        sourceDescription: analysisQueue.sourceDescription,
+        receivedAt: analysisQueue.receivedAt,
         status: analysisQueue.status,
         extractedTermCount: analysisQueue.extractedTermCount,
         analyzedAt: analysisQueue.analyzedAt,

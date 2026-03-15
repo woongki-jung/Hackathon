@@ -7,22 +7,19 @@ import { Spinner } from '@/components/ui/Spinner';
 import { formatDate } from '@/lib/utils/date';
 
 interface ServiceStatus {
-  scheduler: { status: 'running' | 'stopped'; checkInterval: number | null };
-  mail: {
-    imapConfigured: boolean;
-    passwordConfigured: boolean;
-    lastRunAt: string | null;
-    lastRunStatus: string | null;
-    lastRunMailCount: number | null;
-  };
+  scheduler: { status: 'running' | 'stopped' };
+  webhook: { count: number };
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+  lastRunAnalyzedCount: number | null;
   analysis: { apiKeyConfigured: boolean; model: string | null };
 }
 
 interface AnalysisItem {
   id: string;
   fileName: string;
-  mailSubject: string | null;
-  mailReceivedAt: string | null;
+  sourceDescription: string | null;
+  receivedAt: string | null;
   status: string;
   summary: string | null;
   actionItems: string | null;
@@ -32,8 +29,8 @@ interface AnalysisItem {
 
 interface HistoryItem {
   id: string;
-  mailSubject: string | null;
-  mailReceivedAt: string | null;
+  sourceDescription: string | null;
+  receivedAt: string | null;
   status: string;
   extractedTermCount: number | null;
   analyzedAt: string | null;
@@ -111,14 +108,14 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleManualCheck() {
-    if (!confirm('메일 확인을 수동으로 실행하시겠습니까?')) return;
+  async function handleManualAnalysis() {
+    if (!confirm('분석 배치를 수동으로 실행하시겠습니까?')) return;
     setTriggering(true);
     try {
       const res = await fetch('/api/mail/check', { method: 'POST' });
       const json = await res.json();
       if (json.success) {
-        addToast('success', '메일 확인이 시작되었습니다.');
+        addToast('success', '분석이 시작되었습니다.');
       } else {
         addToast('error', json.message ?? '실행에 실패했습니다.');
       }
@@ -146,8 +143,8 @@ export default function DashboardPage() {
     );
   }
 
-  const isImapReady = status?.mail.imapConfigured && status?.mail.passwordConfigured;
   const isApiReady = status?.analysis.apiKeyConfigured;
+  const hasWebhooks = (status?.webhook.count ?? 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -155,21 +152,21 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
         {isAdmin && (
           <button
-            onClick={handleManualCheck}
+            onClick={handleManualAnalysis}
             disabled={triggering}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {triggering && <Spinner size="sm" />}
-            {triggering ? '실행 중...' : '메일 확인 실행'}
+            {triggering ? '실행 중...' : '분석 실행'}
           </button>
         )}
       </div>
 
       {/* 미설정 경고 배너 */}
-      {(!isImapReady || !isApiReady) && (
+      {(!hasWebhooks || !isApiReady) && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
           <strong>설정 필요:</strong>{' '}
-          {!isImapReady && 'IMAP 메일 서버 설정이 완료되지 않았습니다. '}
+          {!hasWebhooks && '등록된 웹훅이 없습니다. '}
           {!isApiReady && 'Gemini API 키가 설정되지 않았습니다. '}
           {isAdmin ? (
             <a href="/settings" className="underline font-medium hover:text-yellow-900">환경설정으로 이동</a>
@@ -189,9 +186,9 @@ export default function DashboardPage() {
             badge={status?.scheduler.status === 'running' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}
           />
           <StatusCard
-            label="메일 서버"
-            value={isImapReady ? '설정됨' : '미설정'}
-            badge={isImapReady ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-600'}
+            label="웹훅"
+            value={`${status?.webhook.count ?? 0}개 등록됨`}
+            badge={hasWebhooks ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-600'}
           />
           <StatusCard
             label="AI API 키"
@@ -200,13 +197,13 @@ export default function DashboardPage() {
           />
           <StatusCard
             label="마지막 실행"
-            value={status?.mail.lastRunAt ? formatDate(status.mail.lastRunAt) : '없음'}
+            value={status?.lastRunAt ? formatDate(status.lastRunAt) : '없음'}
             badge="bg-gray-100 text-gray-600"
           />
         </div>
-        {status?.mail.lastRunAt && (
+        {status?.lastRunAt && (
           <p className="mt-3 text-xs text-gray-500">
-            마지막 실행 결과: {status.mail.lastRunStatus} / 메일 {status.mail.lastRunMailCount ?? 0}건
+            마지막 실행 결과: {status.lastRunStatus} / 분석 {status.lastRunAnalyzedCount ?? 0}건
           </p>
         )}
       </section>
@@ -218,8 +215,8 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="font-medium text-gray-900">{latest.mailSubject ?? '(제목 없음)'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">수신: {formatDate(latest.mailReceivedAt)} · 분석 완료: {formatDate(latest.analyzedAt)}</p>
+                <p className="font-medium text-gray-900">{latest.sourceDescription ?? '(설명 없음)'}</p>
+                <p className="text-xs text-gray-500 mt-0.5">수신: {formatDate(latest.receivedAt)} · 분석 완료: {formatDate(latest.analyzedAt)}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <StatusBadge status={latest.status} />
@@ -254,7 +251,7 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-500">추출 용어 {latest.extractedTermCount ?? 0}개</p>
           </div>
         ) : (
-          <p className="text-gray-400 text-sm text-center py-8">아직 분석된 메일이 없습니다.</p>
+          <p className="text-gray-400 text-sm text-center py-8">아직 분석된 항목이 없습니다.</p>
         )}
       </section>
 
@@ -271,7 +268,7 @@ export default function DashboardPage() {
             <table className="w-full text-sm min-w-[480px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">메일 제목</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">설명</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">수신일</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">상태</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">용어 수</th>
@@ -281,8 +278,8 @@ export default function DashboardPage() {
               <tbody className="divide-y divide-gray-50">
                 {history.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-900 max-w-xs truncate">{item.mailSubject ?? '(제목 없음)'}</td>
-                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell whitespace-nowrap">{formatDate(item.mailReceivedAt)}</td>
+                    <td className="px-4 py-3 text-gray-900 max-w-xs truncate">{item.sourceDescription ?? '(설명 없음)'}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell whitespace-nowrap">{formatDate(item.receivedAt)}</td>
                     <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
                     <td className="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{item.extractedTermCount ?? '-'}</td>
                     <td className="px-4 py-3 text-right">

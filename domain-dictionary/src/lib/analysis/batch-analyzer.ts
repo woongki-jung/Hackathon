@@ -68,8 +68,8 @@ export async function runBatchAnalysis(): Promise<{ analyzed: number; failed: nu
         try {
           saveTerm(term, {
             fileName: item.fileName,
-            mailSubject: item.mailSubject,
-            mailReceivedAt: item.mailReceivedAt,
+            sourceDescription: item.sourceDescription,
+            receivedAt: item.receivedAt,
           });
         } catch (err) {
           logger.warn('[batch-analyzer] 용어 저장 실패', { term: term.name, error: String(err) });

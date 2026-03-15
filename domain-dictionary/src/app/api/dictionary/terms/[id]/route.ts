@@ -31,14 +31,14 @@ export async function GET(
     const sources = db
       .select({
         id: termSourceFiles.id,
-        mailFileName: termSourceFiles.mailFileName,
-        mailSubject: termSourceFiles.mailSubject,
-        mailReceivedAt: termSourceFiles.mailReceivedAt,
+        sourceFileName: termSourceFiles.sourceFileName,
+        sourceDescription: termSourceFiles.sourceDescription,
+        receivedAt: termSourceFiles.receivedAt,
         createdAt: termSourceFiles.createdAt,
       })
       .from(termSourceFiles)
       .where(eq(termSourceFiles.termId, id))
-      .orderBy(termSourceFiles.mailReceivedAt)
+      .orderBy(termSourceFiles.receivedAt)
       .limit(10)
       .all()
       .reverse(); // 최신순

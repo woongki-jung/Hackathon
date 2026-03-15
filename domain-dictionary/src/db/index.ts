@@ -47,8 +47,8 @@ const INIT_SCHEMA_SQL = `
     description TEXT NOT NULL,
     file_path TEXT,
     frequency INTEGER NOT NULL DEFAULT 1,
-    last_source_mail_subject TEXT,
-    last_source_mail_date TEXT,
+    last_source_description TEXT,
+    last_source_date TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
@@ -56,14 +56,14 @@ const INIT_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS term_source_files (
     id TEXT PRIMARY KEY NOT NULL,
     term_id TEXT NOT NULL REFERENCES terms(id),
-    mail_file_name TEXT NOT NULL,
-    mail_subject TEXT,
-    mail_received_at TEXT,
+    source_file_name TEXT NOT NULL,
+    source_description TEXT,
+    received_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
-  CREATE UNIQUE INDEX IF NOT EXISTS term_source_files_term_id_mail_file_name_idx
-    ON term_source_files(term_id, mail_file_name);
+  CREATE UNIQUE INDEX IF NOT EXISTS term_source_files_term_id_source_file_name_idx
+    ON term_source_files(term_id, source_file_name);
 
   CREATE TABLE IF NOT EXISTS stop_words (
     id TEXT PRIMARY KEY NOT NULL,
@@ -74,6 +74,7 @@ const INIT_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS analysis_queue (
     id TEXT PRIMARY KEY NOT NULL,
     file_name TEXT NOT NULL UNIQUE,
+    webhook_code TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
     summary TEXT,
     action_items TEXT,
@@ -81,10 +82,17 @@ const INIT_SCHEMA_SQL = `
     retry_count INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     analyzed_at TEXT,
-    mail_subject TEXT,
-    mail_received_at TEXT,
+    source_description TEXT,
+    received_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS webhooks (
+    id TEXT PRIMARY KEY NOT NULL,
+    code TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `;
 

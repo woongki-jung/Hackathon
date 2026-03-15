@@ -13,13 +13,13 @@ export interface AnalysisFileEntry {
 }
 
 /**
- * 메일 텍스트를 파일로 저장하고 analysis_queue에 pending 상태로 등록합니다.
+ * 텍스트를 파일로 저장하고 analysis_queue에 pending 상태로 등록합니다.
  */
 export function saveAnalysisFile(
   fileName: string,
   textContent: string,
-  mailSubject: string | null,
-  mailReceivedAt: string | null
+  sourceDescription: string | null,
+  receivedAt: string | null
 ): AnalysisFileEntry {
   const filePath = path.join(MAILS_DIR, fileName);
 
@@ -34,8 +34,8 @@ export function saveAnalysisFile(
       .values({
         fileName,
         status: 'pending',
-        mailSubject,
-        mailReceivedAt,
+        sourceDescription,
+        receivedAt,
         createdAt: now,
         updatedAt: now,
       })

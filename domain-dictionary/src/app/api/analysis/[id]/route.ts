@@ -37,7 +37,7 @@ export async function GET(
       })
       .from(termSourceFiles)
       .innerJoin(terms, eq(termSourceFiles.termId, terms.id))
-      .where(eq(termSourceFiles.mailFileName, item.fileName))
+      .where(eq(termSourceFiles.sourceFileName, item.fileName))
       .all();
 
     logger.info('[api/analysis/:id] 분석 상세 조회', { id, userId: session.userId });

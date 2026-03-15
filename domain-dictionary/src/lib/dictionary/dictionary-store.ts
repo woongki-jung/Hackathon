@@ -59,7 +59,7 @@ export interface SaveTermResult {
  */
 export function saveTerm(
   term: ExtractedTerm,
-  source: { fileName: string; mailSubject: string | null; mailReceivedAt: string | null }
+  source: { fileName: string; sourceDescription: string | null; receivedAt: string | null }
 ): SaveTermResult {
   const now = new Date().toISOString();
   const existing = db.select().from(terms).where(eq(terms.name, term.name)).get();
@@ -75,8 +75,8 @@ export function saveTerm(
         description: term.description,
         category: term.category,
         frequency: newFrequency,
-        lastSourceMailSubject: source.mailSubject,
-        lastSourceMailDate: source.mailReceivedAt,
+        lastSourceDescription: source.sourceDescription,
+        lastSourceDate: source.receivedAt,
         updatedAt: now,
       })
       .where(eq(terms.id, existing.id))
@@ -93,8 +93,8 @@ export function saveTerm(
         category: term.category,
         description: term.description,
         frequency: 1,
-        lastSourceMailSubject: source.mailSubject,
-        lastSourceMailDate: source.mailReceivedAt,
+        lastSourceDescription: source.sourceDescription,
+        lastSourceDate: source.receivedAt,
         createdAt: now,
         updatedAt: now,
       })
@@ -111,9 +111,9 @@ export function saveTerm(
     db.insert(termSourceFiles)
       .values({
         termId,
-        mailFileName: source.fileName,
-        mailSubject: source.mailSubject,
-        mailReceivedAt: source.mailReceivedAt,
+        sourceFileName: source.fileName,
+        sourceDescription: source.sourceDescription,
+        receivedAt: source.receivedAt,
         createdAt: now,
       })
       .run();

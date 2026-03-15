@@ -1,7 +1,6 @@
 // SCHED-001: 백그라운드 스케줄러
 import cron, { type ScheduledTask } from 'node-cron';
-import { getSetting } from '@/lib/config/settings-service';
-import { runMailBatch } from '@/lib/mail/mail-batch';
+import { runBatchAnalysis } from '@/lib/analysis/batch-analyzer';
 import { logger } from '@/lib/logger';
 
 // HMR 중복 방지를 위한 전역 싱글톤
@@ -11,8 +10,7 @@ declare global {
 
 /**
  * 스케줄러를 초기화하고 시작합니다.
- * - 서버 시작 시 최초 1회 즉시 실행
- * - DB 설정 기반 주기적 실행 (기본 1시간)
+ * - 매 시간 0분에 분석 배치 실행
  * - HMR 재시작 시 기존 태스크를 종료 후 재생성
  */
 export async function initScheduler(): Promise<void> {
@@ -23,24 +21,13 @@ export async function initScheduler(): Promise<void> {
     logger.info('[scheduler] 기존 스케줄러 종료');
   }
 
-  // 확인 주기 조회 (기본 1시간)
-  const intervalMsStr = await getSetting('mail.check_interval');
-  const intervalMs = intervalMsStr ? Number(intervalMsStr) : 3_600_000;
-  const intervalMin = Math.max(1, Math.round(intervalMs / 60_000));
-
-  // cron 표현식: 매 N분
-  const cronExpr = `*/${intervalMin} * * * *`;
-  logger.info('[scheduler] 스케줄러 시작', { cronExpr, intervalMin });
+  // 매 시간 0분 실행
+  const cronExpr = '0 * * * *';
+  logger.info('[scheduler] 스케줄러 시작', { cronExpr });
 
   global.__scheduler = cron.schedule(cronExpr, async () => {
     logger.info('[scheduler] 주기 실행 트리거');
-    await runMailBatch();
-  });
-
-  // 최초 1회 즉시 실행 (서버 시작 시)
-  logger.info('[scheduler] 최초 1회 즉시 실행');
-  runMailBatch().catch((err) => {
-    logger.error('[scheduler] 최초 실행 오류', { error: String(err) });
+    await runBatchAnalysis();
   });
 }
 
