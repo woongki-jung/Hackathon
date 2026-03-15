@@ -52,6 +52,7 @@ memory: project
 - Playwright MCP를 사용하여 UI 검증 항목을 테스트합니다.
 - API 엔드포인트 검증 (curl 등)
 - 기타 자동화 가능한 테스트
+- vitest 활용 단위테스트 실행
 
 CLAUDE.md의 문서 구조 규칙에 따라:
 - 스크린샷은 `docs/sprint/sprint{N}/` 폴더에 저장합니다.

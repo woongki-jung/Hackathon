@@ -12,8 +12,9 @@
 ## 실행 환경 / 주요 기술스택
 - es2016, css3를 지원하는 웹/모바일 브라우저
 - nextjs 15 버전
-- vercel 무료 인프라를 사용하여 di/ci 및 서비스 배포
 - API 기반 AI 호출 시 gemini api를 사용
+- vercel 무료 인프라 사용 
+- github Actions를 활용하여 di/ci 구성
 
 ## 주요 기능 요구사항
 ### Frontend 기능
