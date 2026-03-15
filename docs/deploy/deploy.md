@@ -12,6 +12,8 @@
 - ✅ `npm run lint` — ESLint 오류 0건
 - ✅ `npm run build` — 프로덕션 빌드 성공 (Next.js 15)
 - ✅ E2E 전체 화면 검증 통과 (로컬, `docs/sprint/test-deploy/test-report.md` 참조)
+- ✅ Vercel 프로덕션 배포 완료 (`npx vercel --prod --token ... --yes`)
+- ✅ 프로덕션 URL 로그인 화면 정상 확인 (`docs/sprint/test-deploy/11-vercel-login.png`)
 
 ---
 

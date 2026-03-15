@@ -100,24 +100,19 @@ git push origin main
 
 ---
 
-### 방법 2: Vercel CLI 수동 배포
+### 방법 2: Vercel CLI 수동 배포 (현재 사용 방식)
+
+> **참고**: 현재 GitHub-Vercel 자동 배포 연동이 설정되어 있지 않아, CLI로 직접 배포합니다.
 
 ```bash
-# Vercel CLI 설치
-npm install -g vercel
-
-# 로그인
-vercel login
-
-# 프로젝트 루트에서 배포 (domain-dictionary 디렉터리)
 cd domain-dictionary
-vercel --prod
+
+# 토큰 인증 + 프로덕션 배포 (--yes로 대화형 입력 생략)
+npx vercel --prod --token <VERCEL_TOKEN> --yes
 ```
 
-토큰으로 인증하는 경우:
-```bash
-vercel --token <VERCEL_TOKEN> --prod
-```
+- Vercel CLI는 `npx`로 별도 설치 없이 실행 가능 (`npx vercel@latest`)
+- 배포 완료 후 `https://domain-dictionary-iota.vercel.app` 에 자동 연결(alias)됨
 
 ---
 
