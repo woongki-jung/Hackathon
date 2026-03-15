@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         ? `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt
            FROM terms_fts fts
            JOIN terms t ON fts.rowid = t.rowid
-           WHERE terms_fts MATCH ? AND t.category = ? AND t.deleted_at IS NULL
+           WHERE terms_fts MATCH ? AND t.category = ?
            ORDER BY bm25(terms_fts), t.frequency DESC
            LIMIT ? OFFSET ?`
         : `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt
