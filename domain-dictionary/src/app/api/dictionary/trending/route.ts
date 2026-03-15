@@ -8,6 +8,8 @@ import { sessionOptions, type SessionData } from '@/lib/auth/session';
 import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
+// 빈도 트렌드는 5분 캐시 (자주 변경되지 않음)
+export const revalidate = 300;
 
 // DICT-002: 빈도 트렌드 상위 10개 용어 조회
 export async function GET() {
