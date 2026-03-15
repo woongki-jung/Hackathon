@@ -717,6 +717,13 @@ git commit -m "fix: 설정 화면 모바일 레이아웃 개선"
 
 ---
 
+## 검증 결과
+
+- [Playwright 테스트 보고서](sprint9/test-report.md)
+- [스크린샷 모음](sprint9/)
+
+---
+
 ## 배포 전략 (CI/CD)
 
 이 스프린트는 UI 개선 및 API 추가 작업으로, 별도의 DB 마이그레이션이 없다.
