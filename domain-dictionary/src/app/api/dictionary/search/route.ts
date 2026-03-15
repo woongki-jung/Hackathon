@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   const sqlite = db.$client;
 
   try {
-    let rows: { id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string }[];
+    let rows: { id: string; name: string; category: string | null; description: string; frequency: number; updatedAt: string; snippet: string | null }[];
     let totalCount: number;
 
     const catFilter = VALID_CATEGORIES.includes(category as never) ? category : null;
@@ -42,15 +42,17 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: true, data: { items: [], pagination: { page, pageSize: PAGE_SIZE, total: 0, totalPages: 0 } } });
       }
 
-      // FTS5 검색: MATCH + 카테고리 필터
+      // FTS5 검색: MATCH + 카테고리 필터 (snippet() 으로 하이라이트 마커 포함)
       const ftsQuery = catFilter
-        ? `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt
+        ? `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt,
+             snippet(terms_fts, 1, '[[', ']]', '...', 16) as snippet
            FROM terms_fts fts
            JOIN terms t ON fts.rowid = t.rowid
            WHERE terms_fts MATCH ? AND t.category = ?
            ORDER BY bm25(terms_fts), t.frequency DESC
            LIMIT ? OFFSET ?`
-        : `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt
+        : `SELECT t.id, t.name, t.category, t.description, t.frequency, t.updated_at as updatedAt,
+             snippet(terms_fts, 1, '[[', ']]', '...', 16) as snippet
            FROM terms_fts fts
            JOIN terms t ON fts.rowid = t.rowid
            WHERE terms_fts MATCH ?
@@ -71,8 +73,8 @@ export async function GET(request: Request) {
     } else {
       // 검색어 없음: 빈도 순 전체 목록
       const listQuery = catFilter
-        ? `SELECT id, name, category, description, frequency, updated_at as updatedAt FROM terms WHERE category = ? ORDER BY frequency DESC LIMIT ? OFFSET ?`
-        : `SELECT id, name, category, description, frequency, updated_at as updatedAt FROM terms ORDER BY frequency DESC LIMIT ? OFFSET ?`;
+        ? `SELECT id, name, category, description, frequency, updated_at as updatedAt, NULL as snippet FROM terms WHERE category = ? ORDER BY frequency DESC LIMIT ? OFFSET ?`
+        : `SELECT id, name, category, description, frequency, updated_at as updatedAt, NULL as snippet FROM terms ORDER BY frequency DESC LIMIT ? OFFSET ?`;
 
       const countQuery = catFilter
         ? `SELECT COUNT(*) as cnt FROM terms WHERE category = ?`
@@ -88,10 +90,11 @@ export async function GET(request: Request) {
       totalCount = countRow?.cnt ?? 0;
     }
 
-    // 해설 미리보기 200자
+    // 해설 미리보기 200자, snippet null 정규화
     const items = rows.map((r) => ({
       ...r,
       description: r.description.length > 200 ? r.description.slice(0, 200) + '…' : r.description,
+      snippet: r.snippet ?? null,
     }));
 
     logger.info('[api/dictionary/search] 검색', { q, category: catFilter, page, count: items.length });
