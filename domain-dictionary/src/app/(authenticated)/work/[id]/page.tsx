@@ -133,7 +133,7 @@ export default function WorkDetailPage() {
           </div>
           <div>
             <dt className="text-gray-500 text-xs mb-0.5">추출 용어 수</dt>
-            <dd className="font-medium text-gray-900">{item.extractedTermCount ?? 0}개</dd>
+            <dd className="font-medium text-gray-900">{extractedTerms.length}개</dd>
           </div>
         </dl>
 
