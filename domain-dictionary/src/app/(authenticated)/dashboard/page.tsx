@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useToast } from '@/lib/toast/toast-context';
 import { Spinner } from '@/components/ui/Spinner';
+import { formatDate } from '@/lib/utils/date';
 
 interface ServiceStatus {
   scheduler: { status: 'running' | 'stopped'; checkInterval: number | null };
@@ -53,14 +55,6 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   processing: { label: '처리 중', cls: 'bg-blue-100 text-blue-600' },
   pending: { label: '대기 중', cls: 'bg-yellow-100 text-yellow-600' },
 };
-
-function formatDate(iso: string | null) {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleString('ko-KR', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  }).replace(/\. /g, '-').replace('.', '').trim();
-}
 
 function StatusBadge({ status }: { status: string }) {
   const b = STATUS_BADGE[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
@@ -227,7 +221,15 @@ export default function DashboardPage() {
                 <p className="font-medium text-gray-900">{latest.mailSubject ?? '(제목 없음)'}</p>
                 <p className="text-xs text-gray-500 mt-0.5">수신: {formatDate(latest.mailReceivedAt)} · 분석 완료: {formatDate(latest.analyzedAt)}</p>
               </div>
-              <StatusBadge status={latest.status} />
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge status={latest.status} />
+                <Link
+                  href={`/work/${latest.id}`}
+                  className="text-xs text-indigo-600 hover:underline whitespace-nowrap"
+                >
+                  상세 보기
+                </Link>
+              </div>
             </div>
             {latest.summary && (
               <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 leading-relaxed">{latest.summary}</p>
@@ -272,6 +274,7 @@ export default function DashboardPage() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">수신일</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">상태</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">용어 수</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -281,6 +284,11 @@ export default function DashboardPage() {
                     <td className="px-4 py-3 text-gray-500 hidden sm:table-cell whitespace-nowrap">{formatDate(item.mailReceivedAt)}</td>
                     <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
                     <td className="px-4 py-3 text-right text-gray-500 hidden sm:table-cell">{item.extractedTermCount ?? '-'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <Link href={`/work/${item.id}`} className="text-xs text-indigo-600 hover:underline">
+                        보기
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
