@@ -48,7 +48,7 @@ describe('cleanupExpiredLogs', () => {
     const expectedCutoffMin = new Date(now - 91 * 24 * 60 * 60 * 1000).toISOString();
     const expectedCutoffMax = new Date(now - 89 * 24 * 60 * 60 * 1000).toISOString();
 
-    let capturedCutoff: string | null = null;
+    const capturedCutoff: string | null = null;
 
     const deleteChain = {
       where: vi.fn().mockImplementation((condition) => {
