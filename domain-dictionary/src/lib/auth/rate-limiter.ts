@@ -11,7 +11,6 @@ const MAX_ATTEMPTS = 10;  // 1분에 10회
 
 // global 싱글톤 (Next.js HMR 환경 대응)
 declare global {
-  // eslint-disable-next-line no-var
   var __loginRateLimit: Map<string, RateLimitEntry> | undefined;
 }
 
