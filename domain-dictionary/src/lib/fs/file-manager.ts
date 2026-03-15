@@ -59,6 +59,13 @@ export function listFiles(dirPath: string): string[] {
 }
 
 /**
+ * 파일 존재 여부를 반환합니다.
+ */
+export function fileExists(filePath: string): boolean {
+  return fs.existsSync(filePath);
+}
+
+/**
  * 파일의 최종 수정 시간(ms)을 반환합니다.
  */
 export function getFileMtimeMs(filePath: string): number | null {

@@ -12,14 +12,14 @@ const GLOSSARY_DIR = process.env.GLOSSARY_STORAGE_PATH ?? './data/terms';
 /**
  * 용어명을 안전한 파일명으로 변환합니다.
  */
-function toSafeFileName(termName: string): string {
+export function toSafeFileName(termName: string): string {
   return termName.replace(/[/\\?%*:|"<>]/g, '_');
 }
 
 /**
  * 용어 해설집 마크다운 파일 내용을 생성합니다.
  */
-function buildGlossaryMarkdown(term: {
+export function buildGlossaryMarkdown(term: {
   name: string;
   category: string;
   description: string;

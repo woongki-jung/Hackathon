@@ -7,11 +7,21 @@ import { db } from '@/db';
 import { users } from '@/db/schema';
 import { sessionOptions, type SessionData } from '@/lib/auth/session';
 import { validateUsername } from '@/lib/validators/auth';
+import { isRateLimited, getClientIp } from '@/lib/auth/rate-limiter';
 
 // better-sqlite3는 Node.js 런타임 전용
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
+  // Rate limiting: IP당 1분에 10회 제한
+  const ip = getClientIp(request);
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { success: false, message: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.' },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await request.json().catch(() => null);
 
