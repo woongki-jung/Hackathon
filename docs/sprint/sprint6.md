@@ -1056,17 +1056,22 @@ T6-1 (pii-filter)
 
 ## 완료 기준 (Definition of Done)
 
-- ⬜ `npm run build` 에러 없이 완료됨
-- ⬜ `npm run lint` 에러 없음
-- ⬜ pii-filter.ts: 이메일/전화번호/주민번호 마스킹 동작
-- ⬜ gemini-client.ts: API 키 미설정 시 NO_API_KEY 에러
-- ⬜ term-extractor.ts: Gemini 응답 JSON 파싱, 불용어 필터링 적용
-- ⬜ description-generator.ts: 요약 500자 이내, actionItems 최대 5개
-- ⬜ dictionary-store.ts: terms 테이블 upsert, `./data/terms/{용어}.md` 파일 생성
-- ⬜ batch-analyzer.ts: pending → processing → completed/failed 상태 전이
-- ⬜ batch-analyzer.ts: retry_count 3회 초과 시 failed 상태 고정
-- ⬜ batch-analyzer.ts: API 키 미설정 시 에러 없이 건너뜀
-- ⬜ mail-batch.ts: Phase 2에서 runBatchAnalysis() 호출됨
+- ✅ `npm run build` 에러 없이 완료됨
+- ✅ `npm run lint` 에러 없음
+- ✅ pii-filter.ts: 이메일/전화번호/주민번호 마스킹 동작
+- ✅ gemini-client.ts: API 키 미설정 시 NO_API_KEY 에러
+- ✅ term-extractor.ts: Gemini 응답 JSON 파싱, 불용어 필터링 적용
+- ✅ description-generator.ts: 요약 500자 이내, actionItems 최대 5개
+- ✅ dictionary-store.ts: terms 테이블 upsert, `./data/terms/{용어}.md` 파일 생성
+- ✅ batch-analyzer.ts: pending → processing → completed/failed 상태 전이
+- ✅ batch-analyzer.ts: retry_count 3회 초과 시 failed 상태 고정
+- ✅ batch-analyzer.ts: API 키 미설정 시 에러 없이 건너뜀
+- ✅ mail-batch.ts: Phase 2에서 runBatchAnalysis() 호출됨
+
+## 검증 결과
+
+- [코드 리뷰 보고서](sprint6/code-review.md)
+- [Playwright 검증 보고서](sprint6/test-report.md)
 
 ---
 
