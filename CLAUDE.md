@@ -110,12 +110,12 @@ description: 스킬 설명
     3. 스프린트 구현이 완료되면 sprint-close agent를 사용하여 마무리 작업(ROADMAP 업데이트, PR 생성, 코드 리뷰, 자동 검증)을 수행해주세요.
 
 - 스프린트 검증 원칙 — **자동화 가능한 항목은 sprint-close 시점에 직접 실행**:
-  - ✅ **자동 실행**: `dotnet test` — 단위/통합 테스트 실행
-  - ✅ **자동 실행**: `dotnet build --configuration Release` — 빌드 성공 여부 확인
-  - ✅ **자동 실행**: 정적 분석 (`dotnet format --verify-no-changes`) — 코드 스타일 검증
-  - ❌ **수동 필요**: `dotnet build --configuration Release` 후 앱 직접 실행 — 새 코드 반영 확인 (타이밍을 사용자가 결정)
-  - ❌ **수동 필요**: DB 마이그레이션 (`dotnet ef database update`) — 스키마 변경 (되돌릴 수 없으므로 사용자가 직접 실행)
-  - ❌ **수동 필요**: WinUI 화면 시각적 확인 (렌더링, 버튼 동작, 네비게이션 등)
+  - ✅ **자동 실행**: `npx vitest run` — 단위/통합 테스트 실행
+  - ✅ **자동 실행**: `npm run build` — 프로덕션 빌드 성공 여부 확인
+  - ✅ **자동 실행**: `npm run lint` — 코드 스타일 검증
+  - ❌ **수동 필요**: `npm run build` 후 앱 직접 실행 (`npm start`) — 새 코드 반영 확인 (타이밍을 사용자가 결정)
+  - ❌ **수동 필요**: DB 마이그레이션 (`npm run db:push`) — 스키마 변경 (되돌릴 수 없으므로 사용자가 직접 실행)
+  - ❌ **수동 필요**: 브라우저 화면 시각적 확인 (렌더링, 버튼 동작, 네비게이션 등)
   - sprint-close agent는 자동 실행 항목을 실행하고 결과를 deploy.md에 기록해야 합니다.
   - deploy.md에는 "자동 검증 완료" 항목과 "수동 검증 필요" 항목을 명확히 구분하여 기재합니다.
 
