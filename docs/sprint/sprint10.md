@@ -919,3 +919,21 @@ git commit -m "fix: GNB에서 불필요한 role=list/listitem ARIA 속성 제거
 | 프로덕션 환경변수 예시 | `docs/deploy/env.example` |
 | 사용자 가이드 | `docs/user-guide.md` |
 | 수정 파일 | `trending/route.ts`, `status/route.ts`, `login/route.ts`, `next.config.ts`, `.env.local.example`, `sync-terms/route.ts`, `GNB.tsx`, `dictionary-store.ts` |
+
+---
+
+## 검증 결과
+
+- [Playwright 테스트 보고서](sprint10/test-report.md)
+- [배포 검증 체크리스트](sprint10/deploy.md)
+- [스크린샷 모음](sprint10/)
+
+### 자동 검증 완료 항목 (2026-03-15)
+
+- ✅ `npm run build` — 성공 (25개 라우트)
+- ✅ `npm run lint` — 오류 없음
+- ✅ 전체 E2E 흐름: 로그인 → 대시보드 → 용어사전 → 설정 → 사용자 관리
+- ✅ 보안 헤더 5종 확인
+- ✅ Rate Limiting (10회/분) 동작 확인
+- ✅ 404 페이지 정상 표시
+- ✅ 콘솔 에러 없음

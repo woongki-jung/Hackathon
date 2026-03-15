@@ -7,6 +7,16 @@
   - TypeScript 오류 없음
   - `api/dictionary/trending` 동적 라우트 정상 등록
 - ✅ `npm run lint` — 오류 없음 (경고 1건: rate-limiter.ts 불필요한 eslint-disable 주석 — 기능 영향 없음)
+- ✅ 로그인 화면 렌더링 — 정상
+- ✅ 로그인 API (`POST /api/auth/login`) — HTTP 200, 세션 생성 정상
+- ✅ 대시보드 (`/dashboard`) — 서비스 상태, 최신 분석 결과, 이력 정상 표시
+- ✅ 환경설정 (`/settings`) — IMAP/AI 설정 폼 정상 표시
+- ✅ 용어사전 (`/dictionary`) — 검색창, 카테고리 필터, 트렌드 표시
+- ✅ 사용자 관리 (`/admin/users`) — 사용자 목록 정상 표시
+- ✅ 보안 헤더 — X-Frame-Options, X-Content-Type-Options, Referrer-Policy, X-XSS-Protection, Permissions-Policy 모두 확인
+- ✅ Rate Limiting — 10회 초과 시 HTTP 429 응답 확인
+- ✅ 404 페이지 — "페이지를 찾을 수 없습니다" 정상 표시
+- ✅ 콘솔 에러 없음 — 대시보드 기준 에러 0건
 
 ## 수동 검증 필요 항목
 
