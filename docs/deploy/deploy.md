@@ -2,6 +2,8 @@
 
 > 작성일: 2026-03-15
 > 배포 대상: Vercel 무료 인프라 (PRD 기준)
+> 프로덕션 URL: https://domain-dictionary-iota.vercel.app
+> GitHub 연동: `woongki-jung/Hackathon` main 브랜치 → 자동 배포
 
 ---
 
@@ -16,9 +18,10 @@
 ## Vercel 배포 수동 작업 필요 항목
 
 ### 1. Vercel 프로젝트 설정
-- ⬜ Vercel 대시보드에서 GitHub 저장소 연결
-- ⬜ Root Directory를 `domain-dictionary`로 설정
-- ⬜ Node.js Version을 20.x로 설정
+- ✅ Vercel 프로젝트 `domain-dictionary` 생성 완료
+- ✅ GitHub `woongki-jung/Hackathon` 저장소 연결 완료
+- ✅ Root Directory `domain-dictionary` 설정 완료
+- ⬜ Node.js Version을 20.x로 설정 확인 (Vercel 대시보드 > Settings > General)
 
 ### 2. 환경변수 등록 (Vercel 대시보드 > Environment Variables)
 - ⬜ `SESSION_SECRET` (32자 이상 랜덤 문자열)

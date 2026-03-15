@@ -2,15 +2,27 @@
 
 > PRD 기준: **Vercel 무료 인프라**를 사용하여 CI/CD 및 서비스 배포
 
+## 배포 현황
+
+| 항목 | 값 |
+|------|-----|
+| 프로젝트명 | `domain-dictionary` |
+| 프로덕션 URL | https://domain-dictionary-iota.vercel.app |
+| Vercel 팀 | `woongs1015-7255s-projects` |
+| GitHub 저장소 | `woongki-jung/Hackathon` |
+| 연동 브랜치 | `main` (Push 시 자동 배포) |
+| 플랜 | Hobby (무료) |
+
 ---
 
 ## 아키텍처 개요
 
 ```
-GitHub (main 브랜치)
+GitHub (main 브랜치) → woongki-jung/Hackathon
     │
     ▼ Push → Vercel 자동 빌드·배포
 Vercel (Next.js 15, Node.js 런타임)
+    └── https://domain-dictionary-iota.vercel.app
     │
     ├── 인증 API / 사용자 관리 API
     ├── 환경설정 API (DB 설정 저장)
@@ -40,9 +52,12 @@ Vercel (Next.js 15, Node.js 런타임)
 
 ## 배포 절차
 
-### 방법 1: GitHub 연동 자동 배포 (권장)
+### 방법 1: GitHub 연동 자동 배포 (권장, 현재 설정)
 
-#### 1단계: Vercel 프로젝트 연결
+> **이미 연결된 상태**: `woongki-jung/Hackathon` → Vercel `domain-dictionary` 프로젝트
+> `main` 브랜치에 Push하면 자동으로 빌드·배포됩니다.
+
+#### 최초 프로젝트 연결 방법 (참고용)
 
 1. [vercel.com](https://vercel.com) 로그인
 2. **Add New Project** → GitHub 저장소 선택
