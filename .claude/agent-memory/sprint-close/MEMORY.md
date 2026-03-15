@@ -10,3 +10,4 @@
 - [Sprint 7 완료 상태](project_sprint7_status.md) — Sprint 7 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, Sprint 8 이월 항목
 - [Sprint 8 완료 상태](project_sprint8_status.md) — Sprint 8 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, Sprint 9 이월 항목
 - [Sprint 9 완료 상태](project_sprint9_status.md) — Sprint 9 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, Sprint 10 이월 항목
+- [Sprint 10 완료 상태](project_sprint10_status.md) — Sprint 10 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, M5 정식 릴리스 완료 (전체 프로젝트 완료)
