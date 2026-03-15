@@ -27,13 +27,21 @@
 
 ## 수동 작업 필요 항목
 
-### 1. Vercel Postgres DB 생성
+### 1. Vercel Postgres 환경변수 등록
 
+> Neon DB는 이미 생성되어 있습니다. Vercel 프로젝트에 환경변수를 수동으로 등록해야 합니다.
+
+**방법 A: Vercel 대시보드에서 Neon 연결 (권장)**
 - ⬜ Vercel 대시보드 → `domain-dictionary` 프로젝트 → **Storage** 탭
-- ⬜ **Create Database** → **Neon Postgres** 선택
-- ⬜ DB 이름 입력 (예: `domain-dictionary-db`) → **Create**
-- ⬜ 생성 후 `domain-dictionary` 프로젝트에 **Connect** 클릭
+- ⬜ 기존 Neon DB가 있는 경우 **Connect Database** → 해당 DB 선택
   - 연결 완료 시 `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING` 등 자동 등록됨
+
+**방법 B: 환경변수 직접 입력**
+- ⬜ Vercel 대시보드 → **Settings** → **Environment Variables** 에서 아래 항목 추가:
+  - `POSTGRES_URL` — Neon 연결 URL (pooler, channel_binding=require)
+  - `POSTGRES_URL_NON_POOLING` — Neon 직접 연결 URL (마이그레이션용)
+  - `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_DATABASE`, `POSTGRES_PASSWORD` — 선택사항
+  > 연결 정보는 `CLAUDE.local.md` 또는 Neon 대시보드에서 확인
 
 ### 2. 불필요한 환경변수 제거 (선택사항)
 
@@ -62,18 +70,23 @@
 
 ### 5. Vercel Cron Jobs 등록 (분석 배치 자동 실행, 선택사항)
 
-- ⬜ `domain-dictionary/vercel.json` 생성:
+> **Vercel Hobby(무료) 플랜 제약:**
+> - Cron Jobs: **1일 최대 2회** (특정 시간대만 지원)
+> - Serverless Function 실행 시간: **최대 10초**
+> - 시간당 실행이 필요하면 Pro 플랜(월 $20) 또는 외부 cron 서비스(GitHub Actions, cron-job.org) 활용
+
+- ⬜ `domain-dictionary/vercel.json` 생성 또는 수정:
   ```json
   {
     "crons": [
       {
         "path": "/api/mail/check",
-        "schedule": "0 * * * *"
+        "schedule": "0 9 * * *"
       }
     ]
   }
   ```
-  > 무료 플랜: 하루 2회 / 유료 플랜: 시간당 1회
+  > Hobby 플랜 예시: 매일 오전 9시 UTC 실행 (`0 9 * * *`)
 
 ---
 
@@ -86,8 +99,8 @@
 | `ADMIN_PASSWORD` | 초기 관리자 비밀번호 | ✅ 등록됨 |
 | `GEMINI_API_KEY` | Gemini API 키 | ✅ 등록됨 |
 | `GEMINI_MODEL` | 사용 모델명 | ✅ 등록됨 |
-| `POSTGRES_URL` | Vercel Postgres 연결 URL | ⬜ Postgres 생성 후 자동 등록 |
-| `POSTGRES_URL_NON_POOLING` | Drizzle 마이그레이션용 URL | ⬜ Postgres 생성 후 자동 등록 |
+| `POSTGRES_URL` | Vercel Postgres 연결 URL | ⬜ 수동 1단계 완료 후 등록 |
+| `POSTGRES_URL_NON_POOLING` | Drizzle 마이그레이션용 URL | ⬜ 수동 1단계 완료 후 등록 |
 
 ---
 

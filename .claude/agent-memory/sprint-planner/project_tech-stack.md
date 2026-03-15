@@ -6,24 +6,25 @@ type: project
 
 수신 이메일의 업무 용어를 자동 분석하여 해설을 제공하는 웹 서비스이다.
 
-**Why:** ROADMAP.md의 기술 아키텍처 결정 사항에 명시된 내용이다. 이전 .NET/WinUI3 기반에서 Next.js 웹 서비스로 기술 스택이 전환되었다.
+**Why:** ROADMAP.md의 기술 아키텍처 결정 사항에 명시된 내용이다. Sprint 10 완료 시점에 SQLite → PostgreSQL(Neon), Anthropic → Gemini, IMAP → 웹훅 수신 방식으로 전환이 완료되었다.
 
-**How to apply:** 구현 계획 수립 시 해당 기술 스택을 일관되게 적용한다.
+**How to apply:** 구현 계획 수립 시 해당 기술 스택을 일관되게 적용한다. Sprint 11 이후로는 배포/운영 관련 Vercel/Neon 인프라 이해가 중요하다.
 
-## 기술 스택
+## 기술 스택 (Sprint 10 완료 기준, 최신)
 
-| 항목 | 선택 | 버전 |
+| 항목 | 선택 | 비고 |
 |------|------|------|
-| 프레임워크 | Next.js (App Router) | 16.1.6 (ROADMAP에 15 명시이나 실제 16.1.6 설치) |
-| 언어 | TypeScript | ^5 |
-| DB | SQLite (better-sqlite3) | ^12.8.0 |
-| ORM | Drizzle ORM + drizzle-kit | ^0.45.1 / ^0.31.9 |
-| 인증 | iron-session + bcrypt | ^8.0.4 / ^6.0.0 |
-| 스타일 | Tailwind CSS | ^4 |
-| 메일 수신 | imapflow | ^1.2.13 |
-| AI 분석 | @anthropic-ai/sdk | ^0.78.0 |
-| 스케줄러 | node-cron | ^4.2.1 |
-| 검색 | SQLite FTS5 | 내장 |
+| 프레임워크 | Next.js 16.1.6 (App Router) | Vercel 서버리스 배포 |
+| 언어 | TypeScript ^5 | |
+| DB | PostgreSQL (Neon, @vercel/postgres) | SQLite에서 Sprint 10에 전환 완료 |
+| ORM | Drizzle ORM | PostgreSQL GIN 인덱스 + tsvector 전문 검색 |
+| 인증 | iron-session + bcrypt | HTTP-only 쿠키 세션 |
+| 스타일 | Tailwind CSS ^4 | |
+| 메일 수신 | 웹훅 수신 (`POST /api/webhook/[code]`) | IMAP에서 웹훅 방식으로 전환 |
+| AI 분석 | @google/generative-ai (Gemini) | GEMINI_API_KEY, GEMINI_MODEL 환경변수 |
+| 스케줄러 | Vercel Cron Jobs + 수동 트리거 | Hobby 플랜: 1일 최대 2회 |
+| 검색 | PostgreSQL GIN 인덱스 + tsvector | FTS5(SQLite)에서 전환 완료 |
+| 배포 | Vercel (Hobby 플랜) | 프로덕션 URL: https://domain-dictionary-iota.vercel.app |
 
 ## 프로젝트 구조
 

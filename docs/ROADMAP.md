@@ -5,7 +5,7 @@
 - **전체 예상 기간**: 5 Phase / 10 Sprint (20주)
 - **현재 진행 단계**: Phase 5 완료 — 전체 10개 스프린트 완료 (2026-03-15)
 - **팀 규모**: 1~2인 소규모 팀
-- **기술 스택**: Next.js 16.1.6 (App Router) + better-sqlite3 + Drizzle ORM + Tailwind CSS
+- **기술 스택**: Next.js 16.1.6 (App Router) + PostgreSQL (Neon) + Drizzle ORM + Tailwind CSS
 
 ## 진행 상태 범례
 - ✅ 완료
@@ -30,15 +30,15 @@
 
 | 결정 사항 | 선택 | 이유 |
 |-----------|------|------|
-| 프레임워크 | Next.js 15 (App Router) | SSR/SSG 지원, API Route 통합, 반응형 웹 서비스에 적합 |
-| DB | SQLite (better-sqlite3) | 단일 파일 DB, 서버 설치 불필요, 소규모 서비스에 적합 |
-| ORM | Drizzle ORM | 타입 안전, 경량, SQLite 친화적 |
+| 프레임워크 | Next.js 16.1.6 (App Router) | SSR/SSG 지원, API Route 통합, 반응형 웹 서비스에 적합 |
+| DB | PostgreSQL (Neon, @vercel/postgres) | 서버리스 환경 최적화, Vercel 네이티브 통합, 확장성 |
+| ORM | Drizzle ORM | 타입 안전, 경량, PostgreSQL 호환 |
 | 인증 | iron-session + bcrypt | HTTP-only 암호화 쿠키, 서버리스 환경 호환 |
 | 스타일 | Tailwind CSS | 유틸리티 퍼스트, 반응형 디자인 생산성 |
-| 메일 수신 | imapflow | IMAP 프로토콜 지원, SSL/TLS, 비동기 처리 |
+| 메일 수신 | 웹훅 수신 (`POST /api/webhook/[code]`) | 서버리스 환경 호환, 외부 메일 서비스 포워딩 지원 |
 | AI 분석 | @google/generative-ai | Gemini API 공식 SDK |
-| 스케줄러 | node-cron | 경량 cron 스케줄링, Next.js 프로세스 내 실행 |
-| 검색 | SQLite FTS5 | 전문 검색, 추가 서비스 불필요 |
+| 스케줄러 | Vercel Cron Jobs + 수동 트리거 | 서버리스 환경 네이티브 스케줄링 (Hobby: 1일 1회) |
+| 검색 | PostgreSQL GIN 인덱스 + tsvector | PostgreSQL 내장 전문 검색, 추가 서비스 불필요 |
 
 ---
 
@@ -879,8 +879,8 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
 |--------|--------|--------|-----------|
 | Claude API rate limit 초과 | 중 | 높음 | 순차 처리, 재시도 로직, 배치 간격 조정 |
 | IMAP 서버 연결 불안정 | 중 | 중 | 지수 백오프 재시도, 타임아웃 설정, 에러 격리 |
-| SQLite 동시성 제한 | 낮음 | 중 | better-sqlite3 동기식 접근으로 잠금 충돌 최소화, WAL 모드 |
-| Next.js HMR에서 스케줄러 중복 | 높음 | 중 | `global.__scheduler` 싱글톤 패턴 |
+| Vercel Hobby Cron 제한 | 중 | 중 | 1일 1회 제한 → Pro 플랜 업그레이드 또는 외부 cron 서비스 활용 |
+| Vercel Serverless 타임아웃 | 중 | 중 | 10초 제한 → 배치 처리를 청크 단위로 분할, 비동기 즉시 응답 패턴 |
 | 대용량 메일 처리 성능 | 낮음 | 중 | 메일 본문 크기 제한, 청크 처리 |
 | 프롬프트 응답 파싱 실패 | 중 | 중 | JSON 스키마 검증, 실패 시 재시도, 폴백 처리 |
 
