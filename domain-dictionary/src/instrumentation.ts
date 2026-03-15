@@ -1,6 +1,6 @@
 export async function register() {
-  // Node.js 런타임에서만 실행 (Edge 런타임 제외)
-  if (process.env.NEXT_RUNTIME === 'nodejs' && !process.env.VERCEL) {
+  // Edge 런타임 제외 (NEXT_RUNTIME이 'nodejs' 또는 undefined일 때 실행)
+  if (process.env.NEXT_RUNTIME !== 'edge' && !process.env.VERCEL) {
     // 관리자 계정 시딩
     try {
       const { seedAdmin } = await import('@/lib/auth/seed-admin');
