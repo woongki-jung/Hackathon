@@ -73,6 +73,13 @@
 
 ---
 
+## PR 정보
+
+- PR URL: https://github.com/woongki-jung/Hackathon/pull/new/sprint8
+- gh CLI 인증 없어 PR 직접 생성 불가 — 위 URL에서 직접 생성 가능
+
+---
+
 ## 환경변수 변경 사항
 
 없음. Sprint 8에서 신규 환경변수 추가 없음.
