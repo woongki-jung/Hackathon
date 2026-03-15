@@ -539,6 +539,15 @@ T8-3 (날짜 유틸 적용)
 
 ---
 
+## 검증 결과
+
+- [Playwright 테스트 보고서](sprint8/test-report.md)
+- [코드 리뷰 보고서](sprint8/code-review.md)
+- [배포 체크리스트](sprint8/deploy.md)
+- [스크린샷 모음](sprint8/)
+
+---
+
 ## Playwright MCP 검증 시나리오
 
 > `npm run dev` 실행 후 아래 순서로 검증 (분석 결과 데이터가 있는 상태 필요)
