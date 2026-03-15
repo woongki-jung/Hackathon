@@ -14,6 +14,15 @@
 - ✅ DB 마이그레이션: SQLite(`@libsql/client`) → PostgreSQL(`@vercel/postgres`) 완료
 - ✅ FTS5(SQLite) → PostgreSQL GIN 인덱스 + `tsvector` 전문 검색으로 전환 완료
 
+## 보안 점검 완료 (2026-03-15)
+
+- ✅ 소스 코드 내 하드코딩된 민감정보 없음 (전수 조사)
+- ✅ git 히스토리 내 민감정보 커밋 이력 없음
+- ✅ `.gitignore` 설정 적절 (`CLAUDE.local.md`, `.env.local` 모두 무시)
+- ✅ `.env.local.example` — SQLite/IMAP 잔재 제거, PostgreSQL/웹훅 기준으로 업데이트
+- ✅ `next.config.ts` — `better-sqlite3` 잔재(`serverExternalPackages`) 제거
+- ✅ 모든 민감정보는 `process.env` 환경변수로만 참조 (안전)
+
 ---
 
 ## 수동 작업 필요 항목
