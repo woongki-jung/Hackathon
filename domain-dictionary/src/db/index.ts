@@ -124,6 +124,36 @@ const TRIGGER_DELETE_SQL = `
   END;
 `;
 
+/**
+ * 스키마 마이그레이션: 기존 DB에서 컬럼명 변경 처리
+ * - SQLite RENAME COLUMN은 3.25.0+에서 지원
+ * - 이미 변경된 경우 오류 무시
+ */
+function runMigrations(sqlite: InstanceType<typeof Database>) {
+  const migrations = [
+    // term_source_files: mail_* → source_*, received_at
+    `ALTER TABLE term_source_files RENAME COLUMN mail_file_name TO source_file_name`,
+    `ALTER TABLE term_source_files RENAME COLUMN mail_subject TO source_description`,
+    `ALTER TABLE term_source_files RENAME COLUMN mail_received_at TO received_at`,
+    // terms: last_source_mail_* → last_source_*
+    `ALTER TABLE terms RENAME COLUMN last_source_mail_subject TO last_source_description`,
+    `ALTER TABLE terms RENAME COLUMN last_source_mail_date TO last_source_date`,
+    // analysis_queue: mail_* → source_description, received_at; add webhook_code
+    `ALTER TABLE analysis_queue RENAME COLUMN mail_subject TO source_description`,
+    `ALTER TABLE analysis_queue RENAME COLUMN mail_received_at TO received_at`,
+    `ALTER TABLE analysis_queue ADD COLUMN webhook_code TEXT`,
+    // webhooks 테이블 (INIT_SCHEMA_SQL의 IF NOT EXISTS로 처리되나 명시적으로도 처리)
+  ];
+
+  for (const sql of migrations) {
+    try {
+      sqlite.exec(sql);
+    } catch {
+      // 이미 마이그레이션 완료 또는 해당 없는 경우 무시
+    }
+  }
+}
+
 function createDbConnection() {
   // data/ 디렉터리 자동 생성
   mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -133,6 +163,9 @@ function createDbConnection() {
   // WAL 모드 및 외래 키 활성화
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('foreign_keys = ON');
+
+  // 스키마 마이그레이션 (기존 DB 컬럼명 변경)
+  runMigrations(sqlite);
 
   // 핵심 테이블 자동 생성 (최초 실행 시 npm run db:push 없이 동작)
   sqlite.exec(INIT_SCHEMA_SQL);

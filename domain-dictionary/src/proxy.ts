@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sessionOptions, type SessionData } from '@/lib/auth/session';
 
 // 인증 없이 접근 가능한 경로 (AUTH-R-012 예외)
-const PUBLIC_PATHS = ['/login', '/api/auth/login'];
+// /api/webhook/ — 외부 서비스에서 호출하는 웹훅 수신 엔드포인트
+const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/webhook/'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
