@@ -19,9 +19,9 @@
 
 | 항목 | 상태 |
 |------|------|
-| 전체 진행률 | 50% (Sprint 1, 2, 3, 4, 5 완료) |
-| 현재 Phase | Phase 3 진행 중 (Sprint 5 완료) |
-| 다음 마일스톤 | Sprint 6 - 용어 분석 파이프라인 (Gemini API 연동) |
+| 전체 진행률 | 60% (Sprint 1, 2, 3, 4, 5, 6 완료) |
+| 현재 Phase | Phase 3 완료 (Sprint 6 완료) — M3 달성 |
+| 다음 마일스톤 | Sprint 7 - 용어사전 뷰어 + 검색 + 트렌드 |
 | 사양 문서 | 정책 5건, 데이터 7건, 기능 24건, API 16건, 화면 7건 정의 완료 |
 
 ---
@@ -490,42 +490,42 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
 
 ---
 
-### Sprint 6: 용어 분석 파이프라인 (2주)
+### Sprint 6: 용어 분석 파이프라인 (2주) — ✅ 완료 (2026-03-15)
 
 #### 작업 목록
 
-- ⬜ **T6-1: 개인정보 필터링 기능 (TERM-PII-001)** [복잡도: 중]
+- ✅ **T6-1: 개인정보 필터링 기능 (TERM-PII-001)** [복잡도: 중]
   - `lib/analysis/pii-filter.ts` 생성
   - 이메일 주소, 전화번호, 주민등록번호 등 개인정보 패턴 마스킹
   - 정규식 기반 패턴 매칭
 
-- ⬜ **T6-2: Claude API 호출 래퍼** [복잡도: 중]
+- ✅ **T6-2: Claude API 호출 래퍼** [복잡도: 중]
   - `lib/analysis/gemini-client.ts` 생성
   - @google/generative-ai 래퍼 (API 키 환경변수 조회, 모델명 설정 조회)
   - HTTP 재시도 적용 (CMN-HTTP-001)
   - API 키 미설정 시 SERVICE_UNAVAILABLE 에러
 
-- ⬜ **T6-3: 용어 추출 기능 (TERM-EXT-001)** [복잡도: 높음]
+- ✅ **T6-3: 용어 추출 기능 (TERM-EXT-001)** [복잡도: 높음]
   - `lib/analysis/term-extractor.ts` 생성
   - Claude API로 메일 본문에서 EMR/비즈니스/약어 용어 추출
   - 프롬프트 설계: 용어명, 카테고리(emr/business/abbreviation/general), 해설 요청
   - 응답 JSON 파싱 및 유효성 검증
 
-- ⬜ **T6-4: 불용어 필터링 기능 (TERM-EXT-002)** [복잡도: 소]
+- ✅ **T6-4: 불용어 필터링 기능 (TERM-EXT-002)** [복잡도: 소]
   - `lib/analysis/stopword-filter.ts` 생성
   - stop_words 테이블에서 불용어 목록 조회
   - 추출된 용어에서 불용어 제거
 
-- ⬜ **T6-5: 용어 분류 기능 (TERM-CLS-001)** [복잡도: 소]
+- ✅ **T6-5: 용어 분류 기능 (TERM-CLS-001)** [복잡도: 소]
   - Claude API 응답에 포함된 category 값 검증
   - emr/business/abbreviation/general 중 하나로 분류
 
-- ⬜ **T6-6: 해설 생성 기능 (TERM-GEN-001)** [복잡도: 중]
+- ✅ **T6-6: 해설 생성 기능 (TERM-GEN-001)** [복잡도: 중]
   - Claude API로 메일 요약(500자 이내) + 후속 작업 제안(최대 5개) 생성
   - 용어별 한국어 해설 생성
   - 프롬프트 설계: 한국어 해설, EMR 시스템 컨텍스트 포함
 
-- ⬜ **T6-7: 용어 사전 저장소 기능 (DATA-DICT-001)** [복잡도: 중]
+- ✅ **T6-7: 용어 사전 저장소 기능 (DATA-DICT-001)** [복잡도: 중]
   - `lib/dictionary/dictionary-store.ts` 생성
   - 용어-해설 쌍 DB 저장 (terms 테이블)
   - 용어 해설집 파일 저장 (`./data/terms/{용어}.md`)
@@ -533,7 +533,7 @@ Next.js 15 프로젝트를 초기화하고, DB 스키마를 정의하며, 인증
   - term_source_files 테이블에 출처 메일 정보 기록
   - SQLite FTS5 인덱스 동기화
 
-- ⬜ **T6-8: 배치 분석 오케스트레이션 (TERM-BATCH-001)** [복잡도: 높음]
+- ✅ **T6-8: 배치 분석 오케스트레이션 (TERM-BATCH-001)** [복잡도: 높음]
   - `lib/analysis/batch-analyzer.ts` 생성
   - Phase 1: 메일 수신 (MAIL-RECV -> MAIL-PROC -> DATA-FILE)
   - Phase 2: 용어 분석 (PII 필터 -> 용어 추출 -> 해설 생성 -> 사전 저장)

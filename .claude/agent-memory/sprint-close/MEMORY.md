@@ -6,3 +6,4 @@
 - [Sprint 3 완료 상태](project_sprint3_status.md) — Sprint 3 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, PR 정보
 - [Sprint 4 완료 상태](project_sprint4_status.md) — Sprint 4 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, Sprint 5 이월 항목
 - [Sprint 5 완료 상태](project_sprint5_status.md) — Sprint 5 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, Sprint 6 이월 항목
+- [Sprint 6 완료 상태](project_sprint6_status.md) — Sprint 6 완료 내역, Playwright 검증 결과, 코드 리뷰 이슈, Sprint 7 이월 항목
