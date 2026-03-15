@@ -15,171 +15,206 @@
 
 ---
 
-## 아키텍처 개요
+## 중요: SQLite 데이터 소멸 문제
+
+### 문제 원인
+
+Vercel Serverless 함수는 `/tmp` 디렉터리만 쓰기 가능하며, 이 경로는 **영구 저장소가 아닙니다.**
+
+| 상황 | 결과 |
+|------|------|
+| **새 배포 실행** | `/tmp` 전체 삭제 → DB 소멸 |
+| **콜드 스타트** | 새 함수 인스턴스 기동 → 빈 DB로 시작 |
+| **동시 요청** | 인스턴스별 독립된 `/tmp` → 서로 다른 DB 참조 |
+
+→ **결과**: 웹훅 등록 정보, 용어사전, 분석 이력이 언제든 소멸될 수 있음.
+→ **현재 상태**: 기능 동작 확인은 가능하나 **운영 환경으로는 사용 불가**.
+
+### 해결 방안 비교
+
+| 방안 | 코드 변경량 | 비용 | 특징 |
+|------|-----------|------|------|
+| **[A] Turso (libSQL)** | 최소 | 무료 | SQLite 호환, 분산 영구 저장 |
+| **[B] Railway 플랫폼 이전** | 없음 | 무료~$5/월 | 영구 파일시스템, 코드 변경 불필요 |
+| **[C] Vercel Postgres (Neon)** | 중간 | 무료 | FTS5 재구현 필요 |
+
+---
+
+### [A] Turso 마이그레이션 (권장)
+
+SQLite와 100% 호환되는 분산 DB. `better-sqlite3`를 `@libsql/client`로 교체합니다.
+
+#### 1단계: Turso 프로젝트 생성
+
+```bash
+# Turso CLI 설치
+npm install -g @turso/cli
+
+# 로그인
+turso auth login
+
+# DB 생성
+turso db create domain-dictionary
+
+# 연결 URL + 인증 토큰 확인
+turso db show domain-dictionary --url
+turso db tokens create domain-dictionary
+```
+
+#### 2단계: 패키지 교체
+
+```bash
+cd domain-dictionary
+npm uninstall better-sqlite3 @types/better-sqlite3
+npm install @libsql/client drizzle-orm@latest
+```
+
+#### 3단계: `drizzle.config.ts` 수정
+
+```ts
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dialect: 'turso',
+  dbCredentials: {
+    url: process.env.TURSO_DATABASE_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  },
+});
+```
+
+#### 4단계: `src/db/index.ts` 수정
+
+```ts
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
+import * as schema from './schema';
+
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL!,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+export const db = drizzle(client, { schema });
+```
+
+> INIT_SCHEMA_SQL 방식은 `npm run db:migrate` 방식으로 전환 필요.
+
+#### 5단계: Vercel 환경변수 추가
+
+| 키 | 설명 |
+|----|------|
+| `TURSO_DATABASE_URL` | `libsql://domain-dictionary-xxx.turso.io` |
+| `TURSO_AUTH_TOKEN` | Turso 인증 토큰 |
+
+`DATABASE_PATH`, `MAIL_STORAGE_PATH`, `GLOSSARY_STORAGE_PATH`는 불필요.
+
+> **파일 저장소 추가 대응**: `/tmp/mails`, `/tmp/terms`도 동일하게 소멸됩니다.
+> Turso 이전 시 분석 텍스트와 용어 파일도 DB 컬럼 저장으로 변경 필요합니다.
+
+---
+
+### [B] Railway 플랫폼 이전 (코드 변경 없음)
+
+Railway는 영구 파일시스템을 지원하여 SQLite를 그대로 사용할 수 있습니다.
+
+#### 배포 절차
+
+1. [railway.app](https://railway.app) 가입 (GitHub 연동)
+2. **New Project** → **Deploy from GitHub repo** → `woongki-jung/Hackathon` 선택
+3. **Root Directory**: `domain-dictionary`
+4. 환경변수 설정 (Vercel과 동일, `DATABASE_PATH=./data/app.db`로 변경)
+5. **Volume 마운트**: `/app/data` 경로에 영구 볼륨 추가
+
+```
+Settings > Volumes > Mount Path: /app/data
+```
+
+6. Push 시 자동 배포
+
+> **비용**: 무료 플랜은 월 $5 크레딧 제공 (소규모 서비스 운용 가능).
+
+---
+
+### [C] Vercel Postgres - Neon (현재 아키텍처 유지)
+
+코드 변경이 가장 많습니다. FTS5 전문 검색을 pg_trgm 또는 tsvector로 재구현해야 합니다.
+
+1. Vercel 대시보드 > Storage > **Create Database** (Neon Postgres)
+2. `DATABASE_URL` 환경변수 자동 등록
+3. `better-sqlite3` → `@vercel/postgres` 또는 `pg` 교체
+4. Drizzle dialect를 `postgresql`로 변경
+5. FTS5 가상 테이블 → `tsvector` 컬럼으로 재구현
+
+---
+
+## 아키텍처 개요 (현재)
 
 ```
 GitHub (main 브랜치) → woongki-jung/Hackathon
     │
     ▼ Push → Vercel 자동 빌드·배포
-Vercel (Next.js 15, Node.js 런타임)
+Vercel (Next.js 16, Node.js 런타임)
     └── https://domain-dictionary-iota.vercel.app
     │
     ├── 인증 API / 사용자 관리 API
-    ├── 환경설정 API (DB 설정 저장)
+    ├── 환경설정 API (웹훅 관리)
     ├── 용어사전 API (FTS5 검색)
+    ├── 웹훅 수신 API (POST /api/webhook/[code])
     └── 분석 API
          │
-         ├── SQLite (data/app.db) — ⚠️ 아래 제약 참조
-         └── 파일 저장소 (data/mails, data/terms) — ⚠️ 아래 제약 참조
+         ├── SQLite (/tmp/app.db) — 영구 저장 불가 (위 해결 방안 참조)
+         └── 파일 저장소 (/tmp/mails, /tmp/terms) — 영구 저장 불가
 ```
 
 ---
 
-## Vercel 환경 제약 사항 ⚠️
-
-| 기능 | 로컬/VPS | Vercel 무료 |
-|------|----------|------------|
-| SQLite 파일 DB | ✅ 영구 저장 | ⚠️ `/tmp` 만 쓰기 가능, 재배포 시 초기화 |
-| 메일 .txt 임시 저장 | ✅ 파일 시스템 | ⚠️ `/tmp` 사용 (단기 유지) |
-| 용어 .md 해설집 저장 | ✅ 파일 시스템 | ⚠️ `/tmp` 사용 (단기 유지) |
-| node-cron 스케줄러 | ✅ 상시 실행 | ❌ Serverless 특성상 불가 → Vercel Cron Jobs 대체 |
-| 최초 실행 seedAdmin | ✅ instrumentation | ❌ `VERCEL` 환경변수로 자동 스킵됨 |
-
-> **참고**: 현재 코드는 `instrumentation.ts`에 `!process.env.VERCEL` 가드가 적용되어 있어,
-> Vercel 환경에서는 스케줄러 초기화와 seedAdmin이 실행되지 않습니다.
-
----
-
-## 배포 절차
-
-### 방법 1: GitHub 연동 자동 배포 (권장, 현재 설정)
-
-> **이미 연결된 상태**: `woongki-jung/Hackathon` → Vercel `domain-dictionary` 프로젝트
-> `main` 브랜치에 Push하면 자동으로 빌드·배포됩니다.
-
-#### 최초 프로젝트 연결 방법 (참고용)
-
-1. [vercel.com](https://vercel.com) 로그인
-2. **Add New Project** → GitHub 저장소 선택
-3. **Root Directory**: `domain-dictionary` 설정
-4. **Framework Preset**: Next.js (자동 감지)
-5. **Build Command**: `npm run build` (기본값)
-6. **Output Directory**: `.next` (기본값)
-
-#### 2단계: 환경변수 설정
-
-Vercel 대시보드 > Project > Settings > Environment Variables에서 아래 항목 추가:
-
-| 키 | 설명 | 예시 |
-|----|------|------|
-| `SESSION_SECRET` | 세션 암호화 키 (32자 이상) | `openssl rand -hex 32` 결과값 |
-| `ADMIN_USERNAME` | 초기 관리자 아이디 | `admin` |
-| `ADMIN_PASSWORD` | 초기 관리자 비밀번호 | `Admin1234!@` |
-| `MAIL_IMAP_HOST` | IMAP 서버 주소 | `imap.gmail.com` |
-| `MAIL_IMAP_PORT` | IMAP 포트 | `993` |
-| `MAIL_USERNAME` | 메일 계정 아이디 | `user@gmail.com` |
-| `MAIL_PASSWORD` | 메일 비밀번호 (앱 비밀번호) | — |
-| `MAIL_USE_SSL` | SSL 사용 여부 | `true` |
-| `MAIL_CHECK_INTERVAL` | 메일 확인 주기 (ms) | `3600000` |
-| `GEMINI_API_KEY` | Gemini API 키 | — |
-| `GEMINI_MODEL` | 사용 모델명 | `gemini-2.0-flash` |
-| `DATABASE_PATH` | DB 경로 | `/tmp/app.db` |
-| `MAIL_STORAGE_PATH` | 메일 임시 저장 경로 | `/tmp/mails` |
-| `GLOSSARY_STORAGE_PATH` | 용어 해설집 경로 | `/tmp/terms` |
-
-> ⚠️ Vercel에서는 `DATABASE_PATH`, `MAIL_STORAGE_PATH`, `GLOSSARY_STORAGE_PATH` 모두
-> `/tmp/...` 경로로 설정해야 합니다 (`/tmp`만 쓰기 가능).
-
-#### 3단계: 배포
-
-`main` 브랜치에 Push 시 자동 배포됩니다.
-
-```bash
-git push origin main
-```
-
----
-
-### 방법 2: Vercel CLI 수동 배포 (현재 사용 방식)
-
-> **참고**: 현재 GitHub-Vercel 자동 배포 연동이 설정되어 있지 않아, CLI로 직접 배포합니다.
+## 배포 절차 (현재: Vercel CLI)
 
 ```bash
 cd domain-dictionary
-
-# 토큰 인증 + 프로덕션 배포 (--yes로 대화형 입력 생략)
 npx vercel --prod --token <VERCEL_TOKEN> --yes
 ```
 
-- Vercel CLI는 `npx`로 별도 설치 없이 실행 가능 (`npx vercel@latest`)
-- 배포 완료 후 `https://domain-dictionary-iota.vercel.app` 에 자동 연결(alias)됨
-
 ---
 
-## 최초 배포 후 관리자 계정 생성
+## 환경변수 목록
 
-Vercel 환경에서는 `instrumentation.ts`의 seedAdmin이 자동 실행되지 않습니다.
-최초 배포 후 관리자 계정을 수동으로 생성해야 합니다.
-
-```bash
-# 로컬에서 Vercel 환경변수와 동일한 설정으로 seed 스크립트 실행
-# 또는 Vercel 대시보드 > Functions > invoke로 실행
-```
-
-> **대안**: 로컬에서 `npm run dev`로 seedAdmin을 실행하고 `data/app.db`를 Vercel에 업로드
-> (단, Vercel 재배포 시 `/tmp` 초기화로 인해 DB가 삭제됨)
-
----
-
-## 메일 수집 스케줄러 (Vercel 환경)
-
-Vercel에서는 node-cron 상시 실행이 불가합니다.
-**Vercel Cron Jobs**를 사용하여 주기적 실행을 대체합니다.
-
-### vercel.json 설정 (크론 등록)
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/mail/check",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
-```
-
-> 무료 플랜 기준: 하루 2회 실행 제한. 유료 플랜에서 시간당 1회 실행 가능.
-
----
-
-## CI/CD 플로우
-
-```
-개발자 Push (main)
-    │
-    ▼
-GitHub Actions / Vercel Build
-    ├── npm install
-    ├── npm run build
-    └── 빌드 성공 시 → Vercel Edge Network에 배포
-```
+| 키 | 설명 | 현재 상태 |
+|----|------|-----------|
+| `SESSION_SECRET` | 세션 암호화 키 (32자 이상) | 등록됨 |
+| `ADMIN_USERNAME` | 초기 관리자 아이디 | 등록됨 |
+| `ADMIN_PASSWORD` | 초기 관리자 비밀번호 | 등록됨 |
+| `GEMINI_API_KEY` | Gemini API 키 | 등록됨 |
+| `GEMINI_MODEL` | 사용 모델명 | 등록됨 |
+| `DATABASE_PATH` | `/tmp/app.db` | 등록됨 (임시) |
+| `MAIL_STORAGE_PATH` | `/tmp/mails` | 등록됨 (임시) |
+| `GLOSSARY_STORAGE_PATH` | `/tmp/terms` | 등록됨 (임시) |
 
 ---
 
 ## 트러블슈팅
 
-### DB 데이터 유실
-- **원인**: Vercel 재배포 시 `/tmp` 초기화
-- **해결**: 영구 DB 솔루션 마이그레이션 권장 (Vercel Postgres, Turso 등)
+### DB 데이터 유실 (배포·콜드스타트)
+- **원인**: Vercel `/tmp` 초기화 — 위 "SQLite 데이터 소멸 문제" 참조
+- **해결**: [A] Turso 또는 [B] Railway로 이전
+
+### 웹훅 등록 후 분석 시 DB가 비어있음
+- **원인**: 요청별로 다른 함수 인스턴스 → 각자 독립된 `/tmp`
+- **해결**: 영구 DB 이전 필요
 
 ### 관리자 로그인 불가 (최초 배포)
-- **원인**: `seedAdmin` 미실행
-- **해결**: Vercel 환경변수에 `ADMIN_USERNAME`, `ADMIN_PASSWORD` 설정 확인 후 로컬에서 DB 초기화
+- **원인**: seedAdmin 미실행
+- **해결**: `instrumentation.ts`에서 Vercel 환경에서도 seedAdmin 자동 실행됨 (현재 코드 기준)
 
 ### 스케줄러 미동작
-- **원인**: Vercel Serverless 환경에서 node-cron 실행 불가
-- **해결**: `vercel.json`에 Cron Jobs 등록 또는 `/api/mail/check` 수동 호출
+- **원인**: Vercel Serverless에서 node-cron 실행 불가
+- **해결**: `vercel.json` Cron Jobs 등록
+  ```json
+  { "crons": [{ "path": "/api/mail/check", "schedule": "0 * * * *" }] }
+  ```
 
 ### better-sqlite3 빌드 오류
 - **원인**: native addon 빌드 환경 불일치
