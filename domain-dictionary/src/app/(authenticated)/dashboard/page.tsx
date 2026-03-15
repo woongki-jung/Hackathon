@@ -267,7 +267,8 @@ export default function DashboardPage() {
           <p className="text-gray-400 text-sm text-center py-12">분석 이력이 없습니다.</p>
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">메일 제목</th>
@@ -293,6 +294,7 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             {pagination && pagination.totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
                 <p className="text-xs text-gray-500">전체 {pagination.total}건</p>

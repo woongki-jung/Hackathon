@@ -13,6 +13,25 @@ interface TermItem {
   description: string;
   frequency: number;
   updatedAt: string;
+  snippet: string | null;
+}
+
+// FTS5 snippet의 [[...]] 마커를 <strong>으로 변환
+function HighlightedText({ text }: { text: string }) {
+  const parts = text.split(/(\[\[.*?\]\])/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith('[[') && part.endsWith(']]') ? (
+          <strong key={i} className="font-semibold text-indigo-700">
+            {part.slice(2, -2)}
+          </strong>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
 }
 
 interface TrendItem {
@@ -156,7 +175,13 @@ function DictionaryContent() {
                           {getCategoryLabel(term.category)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 leading-relaxed">{term.description}</p>
+                      {term.snippet ? (
+                        <p className="text-sm text-gray-600 leading-relaxed">
+                          <HighlightedText text={term.snippet} />
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-600 leading-relaxed">{term.description}</p>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <span className="text-xs text-gray-400">빈도 {term.frequency}</span>
